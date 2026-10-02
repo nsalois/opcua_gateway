@@ -1,0 +1,5 @@
+/target/
+/build-output/
+/firmware-builds/
+__pycache__/
+*.pyc

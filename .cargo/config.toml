@@ -1,0 +1,11 @@
+[env]
+# Task 7 USB-CDC uses one CDC ACM function (control + data interface) and one handler.
+EMBASSY_USB_MAX_INTERFACE_COUNT = "2"
+EMBASSY_USB_MAX_HANDLER_COUNT = "1"
+
+[target.thumbv7em-none-eabihf]
+linker = "ld.lld"
+rustflags = [
+    "-C", "target-cpu=cortex-m7",
+    "-C", "panic=abort",
+]

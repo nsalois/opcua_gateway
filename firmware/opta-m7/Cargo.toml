@@ -1,0 +1,108 @@
+[package]
+name = "opta-m7"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+build = "build.rs"
+
+[[bin]]
+name = "opta-m7"
+path = "src/main.rs"
+test = false
+bench = false
+
+[dependencies]
+cortex-m = { version = "0.7.7", features = ["critical-section-single-core"] }
+cortex-m-rt = { version = "0.7.5", default-features = false, features = ["set-vtor"] }
+critical-section = "1"
+embassy-executor = { version = "0.10", features = ["platform-cortex-m", "executor-thread", "executor-interrupt"] }
+embassy-futures = { version = "0.1.2", optional = true }
+embassy-sync = { version = "0.8", optional = true }
+embassy-time = { version = "0.5" }
+embassy-stm32 = { version = "0.6", features = ["stm32h747xi-cm7", "rt", "time-driver-tim2", "time"] }
+embassy-net = { version = "0.9", features = ["proto-ipv4", "medium-ethernet", "tcp", "udp", "multicast", "dhcpv4", "dhcpv4-hostname", "auto-icmp-echo-reply"] }
+embassy-usb = { version = "0.6", default-features = false, features = ["max-interface-count-2", "max-handler-count-1"] }
+stm32-metapac = "21.0.0"
+static_cell = "2"
+embedded-io-async = "0.7"
+heapless = { version = "0.9", default-features = false }
+rtt-target = "0.6"
+opta-gateway-contracts = { path = "../../crates/contracts", default-features = false }
+opta-buchi = { path = "../../crates/buchi", optional = true }
+opta-opcua = { path = "../../crates/opcua", default-features = false, optional = true }
+opta-runtime = { path = "../../crates/runtime", optional = true }
+opta-tls-verify = { path = "../../crates/tls-verify", default-features = false, optional = true }
+embedded-tls = { version = "0.19.0", default-features = false, optional = true }
+
+[features]
+default = ["product"]
+product = [
+    "dep:embassy-futures",
+    "dep:embassy-sync",
+    "dep:embedded-tls",
+    "dep:opta-buchi",
+    "dep:opta-opcua",
+    "dep:opta-runtime",
+    "opta-gateway-contracts/product",
+    "opta-tls-verify/embedded-tls-019",
+]
+# Suppress NetRunner check-ins after five seconds to exercise IWDG reset.
+diagnostic-suppress-net-runner-checkin = []
+# Suppress MainHeartbeat check-ins after five seconds: degraded health, no reset.
+diagnostic-suppress-main-heartbeat-checkin = []
+# Opt-in diagnostics; never part of the default product. Check-in suppression
+# leaves the task running; USB stalls exercise the blocked operation itself.
+diagnostic-suppress-net-status-checkin = []
+diagnostic-stall-usb-console-write = []
+diagnostic-stall-usb-control = []
+diagnostic-suppress-opcua-listener0-checkin = []
+# Diagnostic-only proof that the interrupt-mode watchdog monitor continues to
+# refresh IWDG while thread mode is deliberately CPU-busy for one second.
+diagnostic-watchdog-cpu-busy = []
+# Diagnostic-only two-boot stack watermark bracket. The first boot normalizes
+# cache state and halts before a debugger paint; the second boot measures the
+# complete initialization/runtime MSP descent across the retained paint.
+diagnostic-stack-watermark = []
+# Diagnostic-only post-boot single-frame trip of the product MPU stack guard.
+diagnostic-stack-guard-trip = []
+# Diagnostic-only early-watchdog reset proof. The first boot deliberately stalls after
+# validated early IWDG arming and before field-config or clock setup. The
+# IWDG-reset boot observes the exact bootloader watchdog handoff and proceeds;
+# target tooling separately captures raw IWDG1RSTF before bootloader clearing.
+diagnostic-pre-clock-stall = []
+# Diagnostic overlay only: embeds the isolated mock CA, fixed verifier time,
+# and mock TLS port. The product feature supplies the gateway composition.
+diagnostic-tls-mock = ["product"]
+# Diagnostic LSE retention instrument only. Selects the Opta external 32.768 kHz
+# input in bypass mode and exports an immutable boot-time RTC register capture.
+# It is not a product candidate or an LKG composition.
+diagnostic-lse-retention = ["product"]
+# Diagnostic-only Ethernet ingress instrumentation. The default product keeps the
+# vendored driver path unchanged unless this explicit feature is selected.
+diagnostic-ethernet-ingress = [
+    "product",
+    "embassy-stm32/opta-f8-ingress-trace",
+]
+# Ethernet receive-ring and cache perturbations. They are diagnostic overlays, never defaults
+# or LKG candidates, and main.rs rejects selecting both in one build.
+diagnostic-ethernet-rx-ring-16 = ["diagnostic-ethernet-ingress"]
+diagnostic-dcache-disabled = ["diagnostic-ethernet-ingress"]
+# Low-impact discriminator: count time-driver events without reading
+# TIM2 registers, recording a ring, or enabling Embassy executor callbacks.
+diagnostic-time-counters = ["embassy-stm32/opta-bh20-time-counters"]
+# Diagnostic-only time-driver tracing. Omits executor callbacks to avoid
+# hiding a scheduling race through additional instrumentation.
+diagnostic-time-driver = ["embassy-stm32/opta-bh20-time-trace"]
+# Expanded diagnostic overlay: add executor callbacks to the same bounded
+# time-driver ring for a failure capture after the lower-impact control.
+diagnostic-executor-wakeup = [
+    "diagnostic-time-driver",
+    "embassy-executor/trace",
+]
+# A/B companion for the Embassy-recommended lower GP-timer tick rate.
+diagnostic-tick-hz-32768 = ["embassy-time/tick-hz-32_768"]
+
+# Temporary exact-board repair. Never part of the default product.
+maintenance-usb-m4-boot-repair = []

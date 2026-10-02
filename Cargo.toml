@@ -1,0 +1,49 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/contracts",
+    "crates/buchi",
+    "crates/runtime",
+    "crates/opcua",
+    "crates/tls-verify",
+    "firmware/opta-m7",
+]
+
+[workspace.package]
+edition = "2021"
+license = "Apache-2.0"
+repository = ""
+
+[profile.release]
+lto = true
+codegen-units = 1
+
+# Host development and test artifacts are disposable. Keep enough line
+# information for useful backtraces without retaining full dependency debug
+# data, and avoid the large incremental cache that previously dominated the
+# workspace target directory. Use `--profile debugging` when full host debug
+# information is deliberately required.
+[profile.dev]
+debug = "line-tables-only"
+incremental = false
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.test]
+debug = "line-tables-only"
+incremental = false
+
+[profile.test.package."*"]
+debug = false
+
+[profile.debugging]
+inherits = "dev"
+debug = "full"
+incremental = true
+
+[profile.debugging.package."*"]
+debug = "full"
+
+[patch.crates-io]
+embassy-stm32 = { path = "vendor/embassy-stm32-0.6.0" }

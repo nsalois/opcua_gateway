@@ -1,0 +1,23 @@
+[package]
+name = "opta-m4-quarantine"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+build = "build.rs"
+
+[[bin]]
+name = "opta-m4-quarantine"
+path = "src/main.rs"
+test = false
+bench = false
+
+# This target-only crate is deliberately isolated from the root workspace.
+# Root host clippy/tests must not compile Cortex-M4 assembly with host flags.
+[workspace]
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = false
