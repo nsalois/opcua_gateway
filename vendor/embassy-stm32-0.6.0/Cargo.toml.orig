@@ -1,9 +1,10 @@
 # Modified for the Opta gateway; see MODIFICATIONS.md for provenance and terms.
+# Locally modified copy of the upstream manifest, not pristine upstream material.
 [package]
 name = "embassy-stm32"
 version = "0.6.0"
 edition = "2024"
-license = "MIT OR Apache-2.0"
+license = "Apache-2.0"
 description = "Embassy Hardware Abstraction Layer (HAL) for ST STM32 series microcontrollers"
 keywords = ["embedded", "async", "stm32", "hal", "embedded-hal"]
 categories = ["embedded", "hardware-support", "no-std", "asynchronous"]

@@ -123,9 +123,10 @@ pub(crate) use watchdog::task_checkin;
 pub(crate) use watchdog::WATCHDOG_TASK_DEADLINE;
 
 // embassy-stm32 treats the H747 as dual-core and requires a SharedData slot
-// to coordinate init between cores. ADR 0010 parks the M4 (no second-core
-// image exists), so this lives in ordinary M7 D1 RAM; it must move to a
-// cross-core-visible region only if a future ADR reopens the M4.
+// to coordinate init between cores. The separate M4 quarantine companion does
+// not participate in the M7 Embassy runtime or initialization, so only M7 uses
+// this slot in ordinary M7 D1 RAM. It must move to a cross-core-visible region
+// if a future design introduces coordinated initialization with M4.
 static SHARED_DATA: MaybeUninit<SharedData> = MaybeUninit::uninit();
 
 bind_interrupts!(struct Irqs {
@@ -362,7 +363,7 @@ async fn main(spawner: Spawner) {
     // OPTA SetSysClock ends with HAL_RCC_MCOConfig(MCO1, HSE, DIV1) (verified
     // by disassembling libmbed.a). Without this the PHY is clockless, emits
     // no 50 MHz RMII REF_CLK, and the ETH DMA software reset polls forever
-    // (bench-observed hang: docs/evidence/m7-ethernet-dhcp-20260610.md).
+    // (unpublished historical bench observation).
     let _mco = Mco::new(
         p.MCO1,
         p.PA8,
@@ -372,9 +373,9 @@ async fn main(spawner: Spawner) {
 
     // These non-RMII board lines are empirical: differential GPIO capture
     // against a known-working firmware image showed them driven before
-    // Ethernet was alive (docs/evidence/m7-ethernet-dhcp-20260610.md); no
-    // datasheet documents them. Keep the Output owners live for the whole
-    // task; dropping them would return the pins to their floating reset state
+    // Ethernet was alive (unpublished historical observations). Datasheet
+    // support for these lines was not established by that investigation. Keep
+    // the Output owners live for the whole task; dropping them would return the pins to their floating reset state
     // and can remove PHY reset/power/clock enables.
     let _eth_ph15 = Output::new(p.PH15, Level::Low, GpioSpeed::Low);
     let _eth_pi0 = Output::new(p.PI0, Level::High, GpioSpeed::Low);

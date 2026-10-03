@@ -46,8 +46,9 @@ unsafe extern "C" {
 /// still enabled by the pre-application environment (the stock bootloader
 /// enables both) while the MPU is disabled. With D-cache enabled, the
 /// CPU-visible RX descriptors can be dirty in cache while the Ethernet DMA
-/// reads stale memory and reports RBU. Bench proof:
-/// docs/evidence/m7-ethernet-dhcp-20260610.md.
+/// reads stale memory and reports RBU. Unpublished historical bench
+/// observations established this failure mode; they do not verify every
+/// boot path or current hardware state.
 #[cfg(not(feature = "product"))]
 pub(crate) fn normalize_cache_state_for_dma() {
     // Steal the Cortex-M core-peripheral proxies at the start of the application,

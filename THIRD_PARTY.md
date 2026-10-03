@@ -23,8 +23,8 @@ and notices are retained in the vendor directory:
 
 Original local additions are Apache-2.0, Copyright 2026 Nicholas Salois;
 they do not claim ownership of upstream work. The combined modified
-dependency can be used under Apache-2.0. The upstream dual-license statement
-is preserved and applies to upstream contributions.
+package is offered under Apache-2.0, as declared by its locally modified
+Cargo manifests. The upstream dual-license statement is preserved and applies to upstream contributions.
 
 No other third-party implementation is copied into this source repository.
 The M4 interrupt-table extract is separately covered below.
