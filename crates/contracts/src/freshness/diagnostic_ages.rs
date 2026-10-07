@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 //! Finite, value-preserving diagnostic publication ages. Absent from product.
 use super::{EntryMetadata, FixedValueCache};
 

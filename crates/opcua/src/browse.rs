@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 use crate::build_info::{
     BUILD_INFO_BINARY, BUILD_INFO_FIELDS, DATATYPE_BUILD_INFO, DATATYPE_STRUCTURE,
     NODEID_BUILD_INFO, NODEID_BUILD_INFO_TYPE, NODEID_DATA_TYPE_ENCODING_TYPE, NODEID_HAS_ENCODING,

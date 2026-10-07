@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 //! Host repros for wave-2 long-horizon arithmetic findings.
 //!
 //! These deliberately exercise the production arithmetic at the cited

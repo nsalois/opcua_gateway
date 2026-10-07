@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 use super::backup_domain::{self, BackupRegisterOwner, BackupRegisterUse, ProjectRecordDomain};
 use super::boot::{self, BootStage};
 use super::cm4::{self, Cm4AuthorizationState};

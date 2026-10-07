@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 //! Static pin for target-only async lock scope in the OPC UA listener.
 
 const PRODUCT_OPCUA: &str = include_str!("../../../firmware/opta-m7/src/product_opcua.rs");

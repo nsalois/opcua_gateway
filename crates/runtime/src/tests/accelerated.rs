@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 use super::{
     http_ok, http_status, verified_client_task, verified_data_access, ScriptedTransport, INFO_JSON,
     PROCESS_JSON, SETTINGS_JSON,

@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 //! Host-test inputs and independent setup checks; never compiled into firmware.
 
 pub const EPOCH_MS: u64 = 4_294_967_296;

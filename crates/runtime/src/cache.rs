@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 use opta_buchi::{
     parse_endpoint_http_response, Endpoint, EndpointResponseError, EndpointValues, InfoValues,
     ProcessValues, SettingsValues,

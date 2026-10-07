@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 use core::str;
 
 pub const APPLICATION_URI_PREFIX: &str = "urn:opta:gateway:rust-native-opcua:";

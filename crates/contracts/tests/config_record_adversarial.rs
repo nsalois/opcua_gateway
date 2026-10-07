@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 use opta_gateway_contracts::config::{
     decode_slot, encode_legacy_slot, encode_reset_slot, encode_slot, select_config, ConfigSource,
     GatewayConfig, GatewayTrust, RecordKind, TrustUpload, TrustUploadError, LEGACY_VERSION,

@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# Copyright 2026 Nicholas Salois.
+#
+# Licensed under the Apache License, Version 2.0.
+# See the LICENSE file in the repository root for the full license.
+
 """Build/report the canonical opta-m7 firmware artifact.
 
 This checker performs host/build-resource validation only. It never flashes

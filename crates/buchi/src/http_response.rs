@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 use crate::{
     consume_one_or_more_digits, eq_ignore_ascii_case, find_crlf, find_header_body_split,
     is_http_whitespace, parse_info_json, parse_process_json, parse_received_http_headers,

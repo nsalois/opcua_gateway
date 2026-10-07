@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 use super::{
     parse_bit_string_bytes, parse_bit_string_with_unused, parse_boolean, parse_small_integer,
     BasicConstraints, Certificate, DerReader, KeyUsage, Rsa2048PublicKey, ServerName, Tlv,

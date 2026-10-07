@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 //! Static pins for target-only ADR 0018 trust authorization boundaries.
 
 const TRANSPORT: &str = include_str!("../../../firmware/opta-m7/src/buchi_tls_transport.rs");

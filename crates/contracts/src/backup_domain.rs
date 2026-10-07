@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 /// STM32H7 RTC backup registers currently in use by the product contract.
 pub const BACKUP_REGISTER_COUNT: u8 = 16;
 

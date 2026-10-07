@@ -1,3 +1,4 @@
+// Modified for the Opta gateway; see MODIFICATIONS.md for provenance and terms.
 #![cfg_attr(not(test), no_std)]
 #![allow(async_fn_in_trait)]
 #![allow(unsafe_op_in_unsafe_fn)]

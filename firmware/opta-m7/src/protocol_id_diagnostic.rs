@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 //! One fixed startup recipe, consumed by the first accepted connection only.
 // Firmware policy marker: crate root declares #![no_std]; no alloc or std.
 use core::sync::atomic::{AtomicU32, Ordering};

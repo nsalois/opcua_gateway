@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 //! Immutable software identity for the standard namespace-zero BuildInfo value.
 //! OPC UA Part 5 sections 7.7/12.4; Part 6 section 5.2.2.15.
 use crate::{Encoder, Result, PRODUCT_URI};

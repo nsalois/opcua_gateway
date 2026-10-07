@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 //! Temporary Board B USB repair overlay; absent from default firmware.
 //! Only the exact CM4 alternate boot field can change, on an explicit command.
 //! Sources: RM0399 Rev 4 sections 4.4.3, 4.5.1, 4.9.4 and 4.9.20;

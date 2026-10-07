@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 // Modified for the Opta gateway; see MODIFICATIONS.md for provenance and terms.
 //! Minimal feature-gated Ethernet/IPv4/TCP digest parsing for the Opta F8 campaign.
 

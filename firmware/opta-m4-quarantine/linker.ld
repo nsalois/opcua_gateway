@@ -1,4 +1,11 @@
 /*
+ * Copyright 2026 Nicholas Salois.
+ *
+ * Licensed under the Apache License, Version 2.0.
+ * See the LICENSE file in the repository root for the full license.
+ */
+
+/*
  * Dependency-free STM32H747XI Cortex-M4 quarantine image.
  *
  * Only the first 4 KiB of physical Bank 2 may contain programmed bytes. The

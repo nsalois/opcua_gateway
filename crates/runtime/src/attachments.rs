@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 pub const ATTACHMENT_HYSTERESIS_POLLS: u8 = 3;
 pub const SUBSYSTEM_COUNT: usize = 5;
 

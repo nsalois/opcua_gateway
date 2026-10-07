@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 use crate::cm4::RCC_GCR_WW1RSC;
 
 pub const IWDG_TIMEOUT_MS: u32 = 10_000;

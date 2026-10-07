@@ -1,4 +1,11 @@
 /*
+ * Copyright 2026 Nicholas Salois.
+ *
+ * Licensed under the Apache License, Version 2.0.
+ * See the LICENSE file in the repository root for the full license.
+ */
+
+/*
  * Build-only STM32H747XI Cortex-M7 memory map for cortex-m-rt.
  *
  * Flash starts at the current product's bootloader-aware M7 application origin:

@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# Copyright 2026 Nicholas Salois.
+#
+# Licensed under the Apache License, Version 2.0.
+# See the LICENSE file in the repository root for the full license.
+
 """Resolve bounded M7 source identity; never build, install, or accept a release."""
 
 from __future__ import annotations

@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 use opta_buchi::{
     build_write_json, lookup_write_spec, lookup_write_spec_by_node_id, validate_write_raw_value,
     BuchiPutTransaction, BuildWriteJsonError, Endpoint, EndpointResponseError, EndpointValues,

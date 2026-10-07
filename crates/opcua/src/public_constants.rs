@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 pub const APPLICATION_NAMESPACE_INDEX: u16 = 1;
 pub const PRODUCT_NAMESPACE_INDEX: u16 = 2;
 pub const PRODUCT_NAMESPACE_URI: &str = "urn:opta:gateway:buchi-r300";

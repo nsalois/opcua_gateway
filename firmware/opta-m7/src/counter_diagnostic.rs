@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 //! Finite, boot-only counter initialization at a real authenticated GET boundary.
 // Firmware policy marker: crate root declares #![no_std]; no alloc or std.
 

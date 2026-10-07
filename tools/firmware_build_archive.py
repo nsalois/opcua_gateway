@@ -1,3 +1,8 @@
+# Copyright 2026 Nicholas Salois.
+#
+# Licensed under the Apache License, Version 2.0.
+# See the LICENSE file in the repository root for the full license.
+
 """Shared BIN-only archive for validated M7 and M4 builds; no hardware or Git writes."""
 
 from __future__ import annotations

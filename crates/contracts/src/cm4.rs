@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 //! Pure STM32H747 CM4 boot-authorization decoding used by firmware and tests.
 
 /// `SYSCFG_UR1.BCM4`, copied from the option-byte boot policy.

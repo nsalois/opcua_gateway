@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 use super::{
     verify_leaf_chain_with_public_key_and_optional_time,
     verify_tls13_certificate_verify_rsa_pss_sha256, Rsa2048PublicKey, ServerName, UnixTime,

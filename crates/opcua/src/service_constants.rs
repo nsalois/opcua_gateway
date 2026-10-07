@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 pub mod status {
     pub const BAD_ENCODING_LIMITS_EXCEEDED: u32 = 0x8008_0000;
     pub const BAD_ENCODING_ERROR: u32 = 0x8006_0000;

@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 use super::{
     activate_test_session, client_open_secure_channel_request, client_uasc_request,
     client_uasc_request_with_auth, create_session_token_for_test, create_subscription_frame,

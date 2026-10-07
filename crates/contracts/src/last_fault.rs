@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 use super::retained_record;
 
 pub const LAST_FAULT_MAGIC: u32 = 0x504D_3032; // "PM02": uptime word is seconds

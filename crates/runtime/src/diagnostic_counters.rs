@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 //! Finite volatile diagnostic inputs, never part of the normal product API.
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

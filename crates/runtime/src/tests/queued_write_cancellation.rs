@@ -1,3 +1,8 @@
+// Copyright 2026 Nicholas Salois.
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file in the repository root for the full license.
+
 use super::{assert_health_value, verified_data_access};
 use crate::{HealthNode, RuntimeDataAccess, RuntimeNode};
 use opta_gateway_contracts::config::TrustState;
