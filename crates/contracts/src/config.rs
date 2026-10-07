@@ -1025,7 +1025,14 @@ fn select_two_valid_slots(slot_a: SlotStatus, slot_b: SlotStatus) -> ConfigSourc
     let kind_b = slot_b.kind.unwrap_or(RecordKind::Normal);
     match (kind_a, kind_b) {
         (RecordKind::Normal, RecordKind::Normal) => {
-            if slot_b.sequence > slot_a.sequence {
+            // Successful alternating writes are adjacent, including MAX -> 1.
+            // Resolve that relation before ordinary numeric ordering, as for
+            // reset records below. Nonadjacent retained records keep their policy.
+            if slot_b.sequence == next_record_sequence(slot_a.sequence) {
+                ConfigSource::SlotB
+            } else if slot_a.sequence == next_record_sequence(slot_b.sequence) {
+                ConfigSource::SlotA
+            } else if slot_b.sequence > slot_a.sequence {
                 ConfigSource::SlotB
             } else {
                 ConfigSource::SlotA

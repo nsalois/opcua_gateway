@@ -14,3 +14,6 @@ purecrypto = { version = "0.6.21", default-features = false, features = ["bignum
 [features]
 default = []
 embedded-tls-019 = ["dep:digest", "dep:embedded-tls"]
+
+[dev-dependencies]
+proptest = "1.7"

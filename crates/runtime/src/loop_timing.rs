@@ -76,3 +76,37 @@ const fn saturating_u32(value: u64) -> u32 {
         value as u32
     }
 }
+
+#[cfg(test)]
+mod counter_tests {
+    use super::LoopTimingMonitor;
+
+    #[test]
+    fn accelerated_timing_publication_saturates_with_full_width_state() {
+        for seed in [
+            u64::from(u32::MAX) - 2,
+            u64::from(u32::MAX) - 1,
+            u64::from(u32::MAX),
+            u64::MAX - 2,
+            u64::MAX - 1,
+            u64::MAX,
+        ] {
+            let mut monitor = LoopTimingMonitor::new(1, 0);
+            monitor.late_heartbeat_count = seed;
+            assert_eq!(monitor.late_heartbeat_count, seed);
+            assert!(monitor.observe(0, 0).is_none());
+            for step in 1..=5u64 {
+                let now = step * 4_294_967_296;
+                let result = monitor.observe(now, now).unwrap();
+                let expected = (u128::from(seed) + u128::from(step)).min(u128::from(u64::MAX));
+                assert_eq!(u128::from(monitor.late_heartbeat_count), expected);
+                assert_eq!(
+                    result.late_heartbeat_count,
+                    expected.min(u128::from(u32::MAX)) as u32
+                );
+                assert_eq!(result.loop_max_gap_ms, u32::MAX);
+                assert_eq!(result.heartbeat_max_gap_ms, u32::MAX);
+            }
+        }
+    }
+}

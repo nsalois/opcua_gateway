@@ -391,6 +391,14 @@ async fn handle_console_command(
         return ConsoleAction::Continue;
     }
     match command {
+        #[cfg(all(
+            feature = "diagnostic-stack-watermark",
+            feature = "diagnostic-accelerated-clock"
+        ))]
+        "stack-capture" if parts.next().is_none() => {
+            let _ = usb_write_str(class, "ok stack-capture-requested\r\n").await;
+            crate::stack_watermark::request_completed_workload_capture();
+        }
         #[cfg(feature = "product")]
         "show" => {
             if parts.next().is_some() {

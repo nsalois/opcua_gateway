@@ -62,6 +62,18 @@ fn regs_gp16() -> TimGp16 {
     unsafe { TimGp16::from_ptr(T::regs()) }
 }
 
+#[cfg(feature = "opta-accelerated-clock")]
+static ACCELERATED_INITIALIZED: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
+#[cfg(feature = "opta-accelerated-clock")]
+static ACCELERATED_WAKE_REGISTRATIONS: AtomicU32 = AtomicU32::new(0);
+
+#[cfg(feature = "opta-accelerated-clock")]
+unsafe extern "C" {
+    fn opta_accelerated_origin_ticks(tick_hz: u32) -> u64;
+    fn opta_accelerated_clock_readback(period: u32, counter: u32, dier: u32, alarm: u64);
+}
+
 #[cfg(feature = "opta-bh20-time-trace")]
 unsafe extern "C" {
     fn opta_bh20_time_trace(
@@ -99,12 +111,14 @@ unsafe extern "C" {
 // a new period start has raced us between reading `period` and `counter`, so we assume the `counter` value
 // corresponds to the next period.
 //
-// `period` is a 32bit integer, so It overflows on 2^32 * 2^15 / 32768 seconds of uptime, which is 136 years.
+// The u32 period counter wraps after 2^47 ticks: about 136 years at 32768 Hz,
+// or 4.46 years at the default 1 MHz. Millisecond consumers remain bounded by
+// this configured driver horizon even when their own timestamps are u64.
 fn calc_now(period: u32, counter: u16) -> u64 {
     ((period as u64) << 15) + ((counter as u32 ^ ((period & 1) << 15)) as u64)
 }
 
-#[cfg(feature = "low-power")]
+#[cfg(any(feature = "low-power", feature = "opta-accelerated-clock"))]
 fn calc_period_counter(ticks: u64) -> (u32, u16) {
     (2 * (ticks >> 16) as u32 + (ticks as u16 >= 0x8000) as u32, ticks as u16)
 }
@@ -130,6 +144,24 @@ embassy_time_driver::time_driver_impl!(static DRIVER: RtcDriver = RtcDriver {
     min_stop_pause: Mutex::const_new(CriticalSectionRawMutex::new(), Cell::new(embassy_time::Duration::from_millis(0))),
     queue: Mutex::new(RefCell::new(Queue::new()))
 });
+
+/// Capture actual period, counter, status, interrupt mask, alarm and wake count.
+/// The timer keeps running; these are observations, never a time-driver mutation.
+#[cfg(feature = "opta-accelerated-clock")]
+pub(crate) fn accelerated_clock_snapshot() -> [u32; 9] {
+    critical_section::with(|cs| {
+        let r = regs_gp16();
+        let period = DRIVER.period.load(Ordering::Relaxed);
+        compiler_fence(Ordering::Acquire);
+        let counter = r.cnt().read().cnt() as u16;
+        let now = calc_now(period, counter);
+        let alarm = DRIVER.alarm.borrow(cs).timestamp.get();
+        [period, u32::from(counter), r.sr().read().0, r.dier().read().0,
+            alarm as u32, (alarm >> 32) as u32,
+            ACCELERATED_WAKE_REGISTRATIONS.load(Ordering::Relaxed),
+            now as u32, (now >> 32) as u32]
+    })
+}
 
 impl RtcDriver {
     /// BH-20 diagnostic events: 1=init, 2=ISR entry, 3=trigger next,
@@ -219,6 +251,38 @@ impl RtcDriver {
 
     fn init(&'static self, cs: CriticalSection) {
         self.init_timer(cs);
+        #[cfg(feature = "opta-accelerated-clock")]
+        {
+            // This executes once, inside HAL initialization's critical section,
+            // before CEN or any task/queue registration. Never reseed a live clock.
+            assert!(!ACCELERATED_INITIALIZED.swap(true, Ordering::Relaxed));
+            assert_eq!(ACCELERATED_WAKE_REGISTRATIONS.load(Ordering::Relaxed), 0);
+            assert_eq!(self.alarm.borrow(cs).timestamp.get(), u64::MAX);
+            // SAFETY: the explicit opta-m7 diagnostic feature supplies this
+            // bounded startup-only input hook. It reads owned atomic seed words.
+            let ticks = unsafe { opta_accelerated_origin_ticks(TICK_HZ as u32) };
+            assert!(ticks < (1u64 << 47));
+            let (period, counter) = calc_period_counter(ticks);
+            let r = regs_gp16();
+            assert!(!r.cr1().read().cen());
+            r.cnt().write(|w| w.set_cnt(counter));
+            self.period.store(period, Ordering::Relaxed);
+            // RM0399 41.4.5: clear startup flags before admitting natural IRQs.
+            r.sr().write_value(regs::SrGp16(0));
+            assert_eq!(r.cnt().read().cnt(), counter);
+            assert_eq!(self.period.load(Ordering::Relaxed), period);
+            assert_eq!(self.now(), ticks);
+            // SAFETY: the diagnostic hook publishes the initialized readback
+            // while interrupts remain excluded and the counter remains stopped.
+            unsafe {
+                opta_accelerated_clock_readback(
+                    period,
+                    counter as u32,
+                    r.dier().read().0,
+                    self.alarm.borrow(cs).timestamp.get(),
+                )
+            };
+        }
         regs_gp16().cr1().modify(|w| w.set_cen(true));
         #[cfg(any(
             feature = "opta-bh20-time-counters",
@@ -448,6 +512,8 @@ impl Driver for RtcDriver {
     }
 
     fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {
+        #[cfg(feature = "opta-accelerated-clock")]
+        ACCELERATED_WAKE_REGISTRATIONS.fetch_add(1, Ordering::Relaxed);
         critical_section::with(|cs| {
             let mut queue = self.queue.borrow(cs).borrow_mut();
 

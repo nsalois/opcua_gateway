@@ -12,7 +12,7 @@ members = [
 [workspace.package]
 edition = "2021"
 license = "Apache-2.0"
-repository = ""
+repository = "https://github.com/nsalois/opcua_gateway"
 
 [profile.release]
 lto = true

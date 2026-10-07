@@ -2,6 +2,12 @@
 #![no_main]
 
 #[cfg(all(
+    feature = "diagnostic-accelerated-clock",
+    feature = "diagnostic-tick-hz-32768"
+))]
+compile_error!("accelerated clock admission requires the unchanged default tick rate");
+
+#[cfg(all(
     feature = "diagnostic-ethernet-rx-ring-16",
     feature = "diagnostic-dcache-disabled"
 ))]
@@ -20,6 +26,14 @@ const _: () = assert!(
     "select no more than one watchdog fault injection feature"
 );
 
+const _: () = assert!(
+    (cfg!(feature = "diagnostic-runtime-counters") as u8)
+        + (cfg!(feature = "diagnostic-cache-ages") as u8)
+        + (cfg!(feature = "diagnostic-trust-heartbeat-counters") as u8)
+        <= 1,
+    "select one finite owner diagnostic per boot"
+);
+
 #[cfg(all(
     feature = "diagnostic-lse-retention",
     any(
@@ -36,7 +50,8 @@ const _: () = assert!(
         feature = "diagnostic-time-counters",
         feature = "diagnostic-time-driver",
         feature = "diagnostic-executor-wakeup",
-        feature = "diagnostic-tick-hz-32768"
+        feature = "diagnostic-tick-hz-32768",
+        feature = "diagnostic-accelerated-clock"
     )
 ))]
 compile_error!("the LSE retention instrument must be built without other diagnostic overlays");
@@ -74,11 +89,19 @@ use opta_gateway_contracts::watchdog::WatchdogSlot;
 use opta_runtime::LoopTimingMonitor;
 use rtt_target::{rprintln, rtt_init_print};
 
+#[cfg(feature = "diagnostic-accelerated-clock")]
+mod accelerated_clock;
 mod board;
 #[cfg(feature = "product")]
 mod buchi_tls_transport;
 mod build_info;
+#[cfg(feature = "diagnostic-cache-ages")]
+mod cache_age_diagnostic;
 mod config_storage;
+#[cfg(feature = "diagnostic-runtime-counters")]
+mod counter_diagnostic;
+#[cfg(feature = "diagnostic-runtime-counters")]
+mod counter_events;
 #[cfg(feature = "diagnostic-ethernet-ingress")]
 mod ethernet_trace;
 mod fault;
@@ -87,6 +110,8 @@ mod network;
 mod probes;
 #[cfg(feature = "product")]
 mod product_opcua;
+#[cfg(feature = "diagnostic-protocol-identifiers")]
+mod protocol_id_diagnostic;
 #[cfg(feature = "diagnostic-stack-guard-trip")]
 mod stack_guard_trip;
 #[cfg(feature = "diagnostic-stack-watermark")]
@@ -100,6 +125,8 @@ mod timebase;
 mod tls_mock;
 #[cfg(feature = "product")]
 mod trust;
+#[cfg(feature = "diagnostic-trust-heartbeat-counters")]
+mod trust_heartbeat_diagnostic;
 mod usb_console;
 #[cfg(feature = "maintenance-usb-m4-boot-repair")]
 mod usb_m4_boot_repair;
@@ -245,6 +272,8 @@ async fn main(spawner: Spawner) {
         config
     };
     board::quiesce_inherited_pll1();
+    #[cfg(feature = "diagnostic-accelerated-clock")]
+    accelerated_clock::prepare_origin();
     let p = embassy_stm32::init_primary(config, &SHARED_DATA);
     board::capture_cm4_post_init(&cm4_boot_observation);
     let boot_last_fault = fault::update_last_fault_reset_flags(boot_reset_flags);
@@ -278,6 +307,8 @@ async fn main(spawner: Spawner) {
     };
     #[cfg(feature = "product")]
     runtime_trust.get_mut().initialize_from_boot(rtc_seconds);
+    #[cfg(feature = "diagnostic-trust-heartbeat-counters")]
+    trust_heartbeat_diagnostic::initialize(runtime_trust.get_mut(), rtc_seconds);
     #[cfg(feature = "product")]
     let runtime_trust: &'static SharedTrust = runtime_trust;
     #[cfg(feature = "product")]
@@ -288,6 +319,14 @@ async fn main(spawner: Spawner) {
         data_access.set_reset_flags(boot_reset_flags);
         trust::PRODUCT_RUNTIME.init(SharedRuntime::new(data_access))
     };
+    #[cfg(feature = "diagnostic-accelerated-clock")]
+    {
+        // Capture one coherent empty-runtime origin before USB spawning and
+        // the first timer await. The normal pre-monitor initialization below
+        // still runs after Ethernet startup, as in the product composition.
+        watchdog::initialize_task_checkins(uptime_now_ms());
+        accelerated_clock::capture_dependents(runtime, runtime_trust);
+    }
     #[cfg(not(feature = "product"))]
     let _ = boot_last_fault;
 
@@ -506,6 +545,14 @@ async fn main(spawner: Spawner) {
                 .expect("task arena: opcua_server_task2"),
         );
     }
+    #[cfg(all(
+        feature = "diagnostic-stack-watermark",
+        feature = "diagnostic-accelerated-clock"
+    ))]
+    spawner.spawn(
+        stack_watermark::completed_workload_capture_task(runtime)
+            .expect("task arena: completed_workload_capture_task"),
+    );
     watchdog::iwdg1_refresh();
     watchdog::initialize_task_checkins(uptime_now_ms());
     let watchdog_spawner = watchdog_executor::start();
@@ -532,7 +579,16 @@ async fn main(spawner: Spawner) {
         if let Some(snapshot) = loop_timing.observe(uptime_ms, Instant::now().as_millis()) {
             probes::publish_loop_timing(snapshot);
         }
-        let ticks = probes::M7_SPIN_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
+        #[cfg(feature = "diagnostic-trust-heartbeat-counters")]
+        let before_tick = probes::M7_SPIN_COUNT.load(Ordering::Relaxed);
+        let ticks = probes::M7_SPIN_COUNT
+            .fetch_add(1, Ordering::Relaxed)
+            .wrapping_add(1);
+        #[cfg(feature = "diagnostic-trust-heartbeat-counters")]
+        {
+            trust_heartbeat_diagnostic::heartbeat(before_tick, ticks, uptime_ms);
+            trust_heartbeat_diagnostic::try_finish(runtime_trust);
+        }
         if ticks % 10 == 0 {
             let link_up = stack.is_link_up();
             probes::M7_LINK_STATE.store(u32::from(link_up), Ordering::Relaxed);

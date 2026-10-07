@@ -219,4 +219,5 @@ pub fn verify_leaf_chain_with_public_key_and_optional_time(
 #[cfg(test)]
 extern crate std;
 
-// Standalone private test suite omitted from this build-only source export.
+#[cfg(test)]
+mod tests;

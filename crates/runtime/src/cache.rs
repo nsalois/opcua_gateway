@@ -54,6 +54,49 @@ pub struct RuntimeCache {
 }
 
 impl RuntimeCache {
+    #[cfg(feature = "diagnostic-cache-ages")]
+    pub(crate) fn diagnostic_begin_age(
+        &mut self,
+        node: RuntimeNode,
+        now: u64,
+        age: opta_gateway_contracts::freshness::DiagnosticAge,
+    ) -> Option<opta_gateway_contracts::freshness::DiagnosticAgeRestore> {
+        self.values.diagnostic_begin_age(node.index(), now, age)
+    }
+
+    #[cfg(feature = "diagnostic-cache-ages")]
+    pub(crate) fn diagnostic_restore_age(
+        &mut self,
+        restore: opta_gateway_contracts::freshness::DiagnosticAgeRestore,
+    ) {
+        self.values.diagnostic_restore_age(restore);
+    }
+
+    /// Read-only target diagnostic state, independently of freshness classification.
+    #[cfg(any(
+        feature = "diagnostic-runtime-counters",
+        feature = "diagnostic-cache-ages"
+    ))]
+    pub fn diagnostic_publication(
+        &self,
+        node: RuntimeNode,
+    ) -> opta_gateway_contracts::freshness::EntryMetadata {
+        self.values
+            .diagnostic_metadata(node.index())
+            .expect("runtime node index")
+    }
+
+    /// Raw state for independent host admission; absent from product builds.
+    #[cfg(any(test, feature = "host-validation"))]
+    pub fn validation_metadata(
+        &self,
+        node: RuntimeNode,
+    ) -> opta_gateway_contracts::freshness::EntryMetadata {
+        self.values
+            .validation_metadata(node.index())
+            .expect("runtime node index")
+    }
+
     pub const fn new() -> Self {
         Self {
             values: FixedValueCache::new(0),
@@ -68,6 +111,15 @@ impl RuntimeCache {
 
     pub const fn completed_fetches(&self) -> u32 {
         self.completed_fetches
+    }
+
+    /// Only the enclosing data-access owner admits this finite initialization.
+    #[cfg(feature = "diagnostic-runtime-counters")]
+    pub(crate) fn diagnostic_seed_successful_fetches(
+        &mut self,
+        seed: crate::DiagnosticCounterSeed,
+    ) {
+        self.completed_fetches = seed.value();
     }
 
     pub const fn failed_fetches(&self) -> u32 {
@@ -967,5 +1019,36 @@ impl RuntimeCache {
 impl Default for RuntimeCache {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod counter_tests {
+    use super::RuntimeCache;
+    use opta_buchi::{Endpoint, EndpointValues, ProcessValues};
+
+    #[test]
+    fn accelerated_fetch_counters_wrap_and_continue() {
+        for seed in [u32::MAX - 2, u32::MAX - 1, u32::MAX] {
+            let mut cache = RuntimeCache::new();
+            cache.completed_fetches = seed;
+            cache.failed_fetches = seed;
+            assert_eq!(
+                (cache.completed_fetches, cache.failed_fetches),
+                (seed, seed)
+            );
+            for operation in 1..=5u64 {
+                let expected = ((u64::from(seed) + operation) % 4_294_967_296) as u32;
+                let success = cache.apply_endpoint_values_report(
+                    EndpointValues::Process(ProcessValues::default()),
+                    operation,
+                );
+                assert_eq!(success.completed_fetches, expected);
+                let failure = cache
+                    .apply_http_response(Endpoint::Process, b"invalid", 7, operation)
+                    .unwrap_err();
+                assert_eq!(failure.failed_fetches, expected);
+            }
+        }
     }
 }

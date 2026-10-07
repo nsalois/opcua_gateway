@@ -6,6 +6,19 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[features]
+diagnostic-protocol-identifiers = []
+
 [dependencies]
 opta-gateway-contracts = { path = "../contracts" }
 opta-runtime = { path = "../runtime" }
+
+[dev-dependencies]
+opta-runtime = { path = "../runtime", features = ["host-validation"] }
+opta-buchi = { path = "../buchi" }
+proptest = "1.7"
+
+[[test]]
+name = "protocol_startup_admission"
+path = "tests/protocol_startup_admission.rs"
+required-features = ["diagnostic-protocol-identifiers"]

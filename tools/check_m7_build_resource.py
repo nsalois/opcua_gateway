@@ -79,6 +79,37 @@ STACK_WATERMARK_FEATURE = "diagnostic-stack-watermark"
 STACK_GUARD_TRIP_FEATURE = "diagnostic-stack-guard-trip"
 WATCHDOG_CPU_BUSY_FEATURE = "diagnostic-watchdog-cpu-busy"
 PRE_CLOCK_STALL_FEATURE = "diagnostic-pre-clock-stall"
+ACCELERATED_CLOCK_FEATURE = "diagnostic-accelerated-clock"
+RUNTIME_COUNTER_FEATURE = "diagnostic-runtime-counters"
+CACHE_AGE_FEATURE = "diagnostic-cache-ages"
+CACHE_AGE_OBJECTS = {"M7_CACHE_AGE_ENABLE_INPUT": 4, "M7_CACHE_AGE_HEADER": 1088,
+                     "M7_CACHE_AGE_BASELINES": 5120, "M7_CACHE_AGE_ROWS": 61440}
+CACHE_AGE_GATE = "M7_CACHE_AGE_GATE"
+TRUST_HEARTBEAT_FEATURE = "diagnostic-trust-heartbeat-counters"
+TRUST_HEARTBEAT_OBJECTS = {"M7_OWNER_COUNTER_RECIPE_INPUT": 4,
+    "M7_OWNER_COUNTER_HEADER": 256, "M7_OWNER_TRUST_ROWS": 640,
+    "M7_OWNER_HEARTBEAT_ROWS": 320, "M7_OWNER_WATCHDOG_ROWS": 320,
+    "M7_OWNER_TRUST_MATERIAL": 4096}
+TRUST_HEARTBEAT_GATE = "M7_OWNER_COUNTER_GATE"
+PROTOCOL_IDENTIFIER_FEATURE = "diagnostic-protocol-identifiers"
+PROTOCOL_IDENTIFIER_OBJECTS = {"M7_PROTOCOL_RECIPE_INPUT": 4,
+                               "M7_PROTOCOL_INITIAL_HEADER": 32}
+RUNTIME_COUNTER_PROBE_SYMBOLS = {
+    "M7_COUNTER_RECIPE_INPUT", "M7_COUNTER_ADMISSION",
+    "M7_COUNTER_EVENTS", "M7_COUNTER_EVENT_SUMMARY",
+}
+RUNTIME_COUNTER_GATE_SYMBOL = "M7_COUNTER_ADMISSION_GATE"
+RUNTIME_COUNTER_EVENTS_GATE_SYMBOL = "M7_COUNTER_EVENTS_GATE"
+ACCELERATED_CLOCK_PROBE_SYMBOLS = {
+    "M7_ACCELERATED_ORIGIN_LOW", "M7_ACCELERATED_ORIGIN_HIGH",
+    "M7_ACCELERATED_SETUP_READY", "M7_ACCELERATED_TICK_HZ",
+    "M7_ACCELERATED_PERIOD", "M7_ACCELERATED_COUNTER", "M7_ACCELERATED_DIER",
+    "M7_ACCELERATED_ALARM_LOW", "M7_ACCELERATED_ALARM_HIGH",
+    "M7_ACCELERATED_CHECKINS", "M7_ACCELERATED_TRUST_LOW", "M7_ACCELERATED_TRUST_HIGH",
+    "M7_ACCELERATED_UNPUBLISHED_TAGS", "M7_ACCELERATED_WRITE_QUEUE_DEPTH",
+    "M7_ACCELERATED_DEPENDENT_NOW_LOW", "M7_ACCELERATED_DEPENDENT_NOW_HIGH",
+    "M7_ACCELERATED_DEPENDENTS_READY",
+}
 STACK_GUARD_TRIP_FIXED_FRAME_SYMBOL = "opta_m7_stack_guard_trip"
 TLS_MOCK_SOURCE = REPO_ROOT / "firmware" / "opta-m7" / "src" / "tls_mock.rs"
 TLS_MOCK_CA_DER = (
@@ -780,6 +811,16 @@ def required_probe_symbols(features: list[str]) -> set[str]:
         symbols |= WATCHDOG_CPU_BUSY_PROBE_SYMBOLS
     if PRE_CLOCK_STALL_FEATURE in features:
         symbols |= EARLY_STARTUP_PROBE_SYMBOLS
+    if any(feature in features for feature in (ACCELERATED_CLOCK_FEATURE, RUNTIME_COUNTER_FEATURE, CACHE_AGE_FEATURE, TRUST_HEARTBEAT_FEATURE, PROTOCOL_IDENTIFIER_FEATURE)):
+        symbols |= ACCELERATED_CLOCK_PROBE_SYMBOLS
+    if RUNTIME_COUNTER_FEATURE in features:
+        symbols |= RUNTIME_COUNTER_PROBE_SYMBOLS
+    if CACHE_AGE_FEATURE in features:
+        symbols |= set(CACHE_AGE_OBJECTS)
+    if TRUST_HEARTBEAT_FEATURE in features:
+        symbols |= set(TRUST_HEARTBEAT_OBJECTS)
+    if PROTOCOL_IDENTIFIER_FEATURE in features:
+        symbols |= set(PROTOCOL_IDENTIFIER_OBJECTS)
     return symbols
 
 
@@ -1024,7 +1065,12 @@ def collect_report(args: argparse.Namespace) -> dict[str, Any]:
         | ethernet_trace_symbol_names
         | TLS_MOCK_TRANSPORT_PROBE_SYMBOLS
         | LSE_RETENTION_PROBE_SYMBOLS
-        | WATCHDOG_CPU_BUSY_PROBE_SYMBOLS,
+        | WATCHDOG_CPU_BUSY_PROBE_SYMBOLS
+        | ACCELERATED_CLOCK_PROBE_SYMBOLS
+        | RUNTIME_COUNTER_PROBE_SYMBOLS | {RUNTIME_COUNTER_GATE_SYMBOL, RUNTIME_COUNTER_EVENTS_GATE_SYMBOL}
+        | set(CACHE_AGE_OBJECTS) | {CACHE_AGE_GATE}
+        | set(TRUST_HEARTBEAT_OBJECTS) | {TRUST_HEARTBEAT_GATE}
+        | {"M7_ACCELERATED_CLOCK_GATE", "M7_ACCELERATED_DEPENDENTS_READY_GATE"},
     )
 
     failures: list[str] = []
@@ -1302,6 +1348,87 @@ def collect_report(args: argparse.Namespace) -> dict[str, Any]:
     failures.extend(generated_frame_failures)
     failures.extend(guard_trip_frame_failures)
     failures.extend(stack_guard_contract_failures)
+    accelerated_selected = (ACCELERATED_CLOCK_FEATURE in args.features
+                            or RUNTIME_COUNTER_FEATURE in args.features
+                            or CACHE_AGE_FEATURE in args.features
+                            or TRUST_HEARTBEAT_FEATURE in args.features
+                            or PROTOCOL_IDENTIFIER_FEATURE in args.features)
+    accelerated_present = set(symbols) & ACCELERATED_CLOCK_PROBE_SYMBOLS
+    if accelerated_selected != (accelerated_present == ACCELERATED_CLOCK_PROBE_SYMBOLS):
+        failures.append("accelerated clock probes do not match the explicit feature")
+    if not accelerated_selected and accelerated_present:
+        failures.append("product build contains accelerated clock diagnostic probes")
+    for gate in ("M7_ACCELERATED_CLOCK_GATE", "M7_ACCELERATED_DEPENDENTS_READY_GATE"):
+        gate_address = symbols.get(gate)
+        if accelerated_selected:
+            if gate_address is None or not 0x08040000 <= gate_address < 0x080C0000:
+                failures.append(f"accelerated startup gate missing or outside M7 Flash: {gate}")
+        elif gate_address is not None:
+            failures.append(f"product build links accelerated startup gate: {gate}")
+    counter_selected = RUNTIME_COUNTER_FEATURE in args.features
+    counter_present = set(symbols) & RUNTIME_COUNTER_PROBE_SYMBOLS
+    if counter_selected and counter_present != RUNTIME_COUNTER_PROBE_SYMBOLS:
+        failures.append("counter diagnostic probes missing from explicit feature")
+    if not counter_selected and (counter_present or RUNTIME_COUNTER_GATE_SYMBOL in symbols
+                                or RUNTIME_COUNTER_EVENTS_GATE_SYMBOL in symbols):
+        failures.append("build without counter feature links counter diagnostic probes")
+    if counter_selected:
+        gate_address = symbols.get(RUNTIME_COUNTER_GATE_SYMBOL, 0)
+        if not 0x08040000 <= gate_address < 0x080C0000:
+            failures.append("counter gate missing or outside M7 Flash")
+        event_gate = symbols.get(RUNTIME_COUNTER_EVENTS_GATE_SYMBOL, 0)
+        if not 0x08040000 <= event_gate < 0x080C0000:
+            failures.append("counter event gate missing or outside M7 Flash")
+        snapshot_address = symbols.get("M7_COUNTER_ADMISSION", 0)
+        if snapshot_address % 32 or not RAM_D1_ORIGIN <= snapshot_address <= RAM_D1_END - 320:
+            failures.append("counter snapshot is not a whole-line aligned D1 extent")
+        input_address = symbols.get("M7_COUNTER_RECIPE_INPUT", 0)
+        if input_address % 4 or not RAM_D1_ORIGIN <= input_address <= RAM_D1_END - 4:
+            failures.append("counter recipe input is not aligned D1 storage")
+        for name, size in (("M7_COUNTER_EVENTS", 6144), ("M7_COUNTER_EVENT_SUMMARY", 128)):
+            address = symbols.get(name, 0)
+            if address % 32 or not RAM_D1_ORIGIN <= address <= RAM_D1_END - size:
+                failures.append(f"counter event object lacks whole-line aligned D1 extent: {name}")
+    cache_selected = CACHE_AGE_FEATURE in args.features
+    cache_present = set(symbols) & (set(CACHE_AGE_OBJECTS) | {CACHE_AGE_GATE})
+    if cache_selected:
+        if cache_present != set(CACHE_AGE_OBJECTS) | {CACHE_AGE_GATE}:
+            failures.append("cache age diagnostic probes/gate missing")
+        if not 0x08040000 <= symbols.get(CACHE_AGE_GATE, 0) < 0x080C0000:
+            failures.append("cache age gate missing or outside M7 Flash")
+        for name, size in CACHE_AGE_OBJECTS.items():
+            address = symbols.get(name, 0)
+            alignment = 4 if size == 4 else 32
+            if address % alignment or not RAM_D1_ORIGIN <= address <= RAM_D1_END - size:
+                failures.append(f"cache age object lacks aligned D1 extent: {name}")
+    elif cache_present:
+        failures.append("build without cache age feature links cache diagnostics")
+    owner_selected = TRUST_HEARTBEAT_FEATURE in args.features
+    owner_present = set(symbols) & (set(TRUST_HEARTBEAT_OBJECTS) | {TRUST_HEARTBEAT_GATE})
+    if owner_selected:
+        if owner_present != set(TRUST_HEARTBEAT_OBJECTS) | {TRUST_HEARTBEAT_GATE}:
+            failures.append("trust/heartbeat diagnostic probes/gate missing")
+        if not 0x08040000 <= symbols.get(TRUST_HEARTBEAT_GATE, 0) < 0x080C0000:
+            failures.append("trust/heartbeat gate missing or outside M7 Flash")
+        for name, size in TRUST_HEARTBEAT_OBJECTS.items():
+            address = symbols.get(name, 0)
+            alignment = 4 if size == 4 else 32
+            if address % alignment or not RAM_D1_ORIGIN <= address <= RAM_D1_END - size:
+                failures.append(f"trust/heartbeat object lacks aligned D1 extent: {name}")
+    elif owner_present:
+        failures.append("build without trust/heartbeat feature links owner diagnostics")
+    protocol_selected = PROTOCOL_IDENTIFIER_FEATURE in args.features
+    protocol_present = set(symbols) & set(PROTOCOL_IDENTIFIER_OBJECTS)
+    if protocol_selected:
+        if protocol_present != set(PROTOCOL_IDENTIFIER_OBJECTS):
+            failures.append("protocol identifier diagnostic probes missing")
+        for name, size in PROTOCOL_IDENTIFIER_OBJECTS.items():
+            address = symbols.get(name, 0)
+            alignment = 4 if size == 4 else 32
+            if address % alignment or not RAM_D1_ORIGIN <= address <= RAM_D1_END - size:
+                failures.append(f"protocol identifier object lacks aligned D1 extent: {name}")
+    elif protocol_present:
+        failures.append("build without protocol identifier feature links its diagnostics")
     if failures:
         raise RuntimeError("M7 resource validation failed:\n" + "\n".join(failures))
 
@@ -1522,6 +1649,7 @@ def collect_report(args: argparse.Namespace) -> dict[str, Any]:
         "release_accepted": False,
         "acceptance": {
             "artifact_built": True,
+            "accelerated_clock_probes_match_feature_boundary": True,
             "reset_vector_at_flash_origin": True,
             "reset_handler_in_flash_window": True,
             "vector_table_at_flash_origin": True,

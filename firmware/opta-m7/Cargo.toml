@@ -103,6 +103,27 @@ diagnostic-executor-wakeup = [
 ]
 # A/B companion for the Embassy-recommended lower GP-timer tick rate.
 diagnostic-tick-hz-32768 = ["embassy-time/tick-hz-32_768"]
+# Startup-only coherent clock origin for the accelerated boundary campaign.
+# No running timer, cache or watchdog state can be reseeded through this overlay.
+diagnostic-accelerated-clock = ["product", "embassy-stm32/opta-accelerated-clock"]
+# One finite boot recipe, admitted after the first authenticated parsed GET.
+# Inputs are consumed at the existing pre-HAL clock gate; no running RAM setter.
+diagnostic-runtime-counters = [
+    "diagnostic-accelerated-clock",
+    "opta-runtime/diagnostic-runtime-counters",
+]
+diagnostic-cache-ages = [
+    "diagnostic-accelerated-clock",
+    "opta-runtime/diagnostic-cache-ages",
+]
+# Finite boot trust changes and actual heartbeat/healthy-refresh counter records.
+# Saved configuration, RTC, runtime cadence and normal product remain unchanged.
+diagnostic-trust-heartbeat-counters = ["diagnostic-accelerated-clock"]
+# One startup recipe and one accepted connection; no running identifier setter.
+diagnostic-protocol-identifiers = [
+    "diagnostic-accelerated-clock",
+    "opta-opcua/diagnostic-protocol-identifiers",
+]
 
 # Temporary exact-board repair. Never part of the default product.
 maintenance-usb-m4-boot-repair = []

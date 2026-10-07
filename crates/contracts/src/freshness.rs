@@ -1,5 +1,10 @@
 use super::opcua_status;
 
+#[cfg(feature = "diagnostic-cache-ages")]
+mod diagnostic_ages;
+#[cfg(feature = "diagnostic-cache-ages")]
+pub use diagnostic_ages::{DiagnosticAge, DiagnosticAgeRestore};
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CacheReadStatus {
     Ok,
@@ -150,6 +155,18 @@ pub struct FixedValueCache<const ENTRIES: usize> {
 }
 
 impl<const ENTRIES: usize> FixedValueCache<ENTRIES> {
+    /// Raw publication state; this cannot alter a value, timestamp or policy.
+    #[cfg(feature = "diagnostic-publication-metadata")]
+    pub fn diagnostic_metadata(&self, index: usize) -> Option<EntryMetadata> {
+        self.entries.get(index).map(|entry| entry.metadata)
+    }
+
+    /// Raw state for independent host admission; absent from product builds.
+    #[cfg(feature = "host-validation")]
+    pub fn validation_metadata(&self, index: usize) -> Option<EntryMetadata> {
+        self.entries.get(index).map(|entry| entry.metadata)
+    }
+
     pub const fn new(default_freshness_ms: u32) -> Self {
         Self {
             entries: [ValueSlot::unpublished(default_freshness_ms); ENTRIES],

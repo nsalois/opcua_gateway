@@ -286,6 +286,10 @@ pub(crate) async fn run_buchi_tls_client<O: TlsObserver>(
     let mut response = HttpReceiveBuffer::<{ product::BUCHI_HTTP_RESPONSE_BYTES }>::new();
     let mut read_chunk = [0u8; TLS_READ_CHUNK_BYTES];
     let mut scheduler = EndpointPollScheduler::new(crate::uptime_now_ms());
+    #[cfg(feature = "diagnostic-runtime-counters")]
+    let mut counter_session = crate::counter_diagnostic::CounterSession::from_startup();
+    #[cfg(feature = "diagnostic-cache-ages")]
+    let mut cache_age_session = crate::cache_age_diagnostic::CacheAgeSession::from_startup();
 
     loop {
         crate::task_checkin(WatchdogSlot::BuchiTlsClient);
@@ -500,6 +504,20 @@ pub(crate) async fn run_buchi_tls_client<O: TlsObserver>(
                     &observer,
                     config.trust_source,
                     attempt_trust.generation(),
+                    #[cfg(any(
+                        feature = "diagnostic-runtime-counters",
+                        feature = "diagnostic-cache-ages"
+                    ))]
+                    attempt_trust.verifier_time().is_some(),
+                    #[cfg(feature = "diagnostic-runtime-counters")]
+                    &mut counter_session,
+                    #[cfg(feature = "diagnostic-cache-ages")]
+                    &mut cache_age_session,
+                    #[cfg(any(
+                        feature = "diagnostic-runtime-counters",
+                        feature = "diagnostic-cache-ages"
+                    ))]
+                    POLL_ENDPOINTS.map(|owner| scheduler.next_due_ms(owner)),
                 )
                 .await
                 {
@@ -512,8 +530,10 @@ pub(crate) async fn run_buchi_tls_client<O: TlsObserver>(
                 crate::task_checkin(WatchdogSlot::BuchiTlsClient);
             }
 
-            if !connection_failed
-                && !drain_pending_writes_over_tls_shared(
+            if !connection_failed {
+                #[cfg(feature = "diagnostic-runtime-counters")]
+                counter_session.before_drain();
+                if !drain_pending_writes_over_tls_shared(
                     &mut tls,
                     host_header.as_str(),
                     auth_token,
@@ -526,8 +546,9 @@ pub(crate) async fn run_buchi_tls_client<O: TlsObserver>(
                     attempt_trust.generation(),
                 )
                 .await
-            {
-                connection_failed = true;
+                {
+                    connection_failed = true;
+                }
             }
 
             if connection_failed {
@@ -536,6 +557,8 @@ pub(crate) async fn run_buchi_tls_client<O: TlsObserver>(
         }
 
         if connection_failed {
+            #[cfg(feature = "diagnostic-runtime-counters")]
+            crate::counter_events::abort(3);
             crate::M7_BUCHI_TRUST_READY.store(0, Ordering::Relaxed);
             let revoked = runtime_trust_revoked();
             let state = if revoked {
@@ -745,6 +768,8 @@ async fn drain_pending_writes_over_tls_shared<const RESPONSE_CAPACITY: usize>(
                     0,
                     write_http_status_to_opcua_status(0, -1),
                     TlsTransportError::BuildRequest,
+                    #[cfg(feature = "diagnostic-runtime-counters")]
+                    dispatch.request.sequence,
                 )
                 .await;
                 return false;
@@ -764,6 +789,8 @@ async fn drain_pending_writes_over_tls_shared<const RESPONSE_CAPACITY: usize>(
                 0,
                 opcua_status::BAD_USER_ACCESS_DENIED,
                 TlsTransportError::TrustRevoked,
+                #[cfg(feature = "diagnostic-runtime-counters")]
+                dispatch.request.sequence,
             )
             .await;
             return false;
@@ -782,6 +809,8 @@ async fn drain_pending_writes_over_tls_shared<const RESPONSE_CAPACITY: usize>(
                     0,
                     opcua_status::BAD_USER_ACCESS_DENIED,
                     TlsTransportError::TrustRevoked,
+                    #[cfg(feature = "diagnostic-runtime-counters")]
+                    dispatch.request.sequence,
                 )
                 .await;
                 return false;
@@ -797,6 +826,8 @@ async fn drain_pending_writes_over_tls_shared<const RESPONSE_CAPACITY: usize>(
                         0,
                         write_http_status_to_opcua_status(0, -1),
                         TlsTransportError::TlsWrite,
+                        #[cfg(feature = "diagnostic-runtime-counters")]
+                        dispatch.request.sequence,
                     )
                     .await;
                     return false;
@@ -815,6 +846,8 @@ async fn drain_pending_writes_over_tls_shared<const RESPONSE_CAPACITY: usize>(
                 0,
                 write_http_status_to_opcua_status(0, -1),
                 TlsTransportError::TlsWrite,
+                #[cfg(feature = "diagnostic-runtime-counters")]
+                dispatch.request.sequence,
             )
             .await;
             return false;
@@ -833,6 +866,8 @@ async fn drain_pending_writes_over_tls_shared<const RESPONSE_CAPACITY: usize>(
                         0,
                         write_http_status_to_opcua_status(0, -1),
                         TlsTransportError::TlsRead,
+                        #[cfg(feature = "diagnostic-runtime-counters")]
+                        dispatch.request.sequence,
                     )
                     .await;
                     return false;
@@ -846,6 +881,8 @@ async fn drain_pending_writes_over_tls_shared<const RESPONSE_CAPACITY: usize>(
                     0,
                     write_http_status_to_opcua_status(0, -1),
                     TlsTransportError::TlsRead,
+                    #[cfg(feature = "diagnostic-runtime-counters")]
+                    dispatch.request.sequence,
                 )
                 .await;
                 return false;
@@ -858,6 +895,8 @@ async fn drain_pending_writes_over_tls_shared<const RESPONSE_CAPACITY: usize>(
                     0,
                     write_http_status_to_opcua_status(0, -1),
                     TlsTransportError::HttpResponse,
+                    #[cfg(feature = "diagnostic-runtime-counters")]
+                    dispatch.request.sequence,
                 )
                 .await;
                 return false;
@@ -873,6 +912,8 @@ async fn drain_pending_writes_over_tls_shared<const RESPONSE_CAPACITY: usize>(
                         0,
                         write_http_status_to_opcua_status(0, -1),
                         TlsTransportError::HttpResponse,
+                        #[cfg(feature = "diagnostic-runtime-counters")]
+                        dispatch.request.sequence,
                     )
                     .await;
                     return false;
@@ -890,6 +931,8 @@ async fn drain_pending_writes_over_tls_shared<const RESPONSE_CAPACITY: usize>(
                     0,
                     write_http_status_to_opcua_status(0, -1),
                     TlsTransportError::HttpResponse,
+                    #[cfg(feature = "diagnostic-runtime-counters")]
+                    dispatch.request.sequence,
                 )
                 .await;
                 return false;
@@ -897,10 +940,25 @@ async fn drain_pending_writes_over_tls_shared<const RESPONSE_CAPACITY: usize>(
         };
         let completion_status = write_http_status_to_opcua_status(http_status, 0);
         if !trust_session_current(trust_source, trust_generation).await {
+            // The request was already dequeued before awaiting the response.
+            // Record the local failed outcome without publishing the obsolete-trust reply.
+            record_write_completion_shared(
+                observer,
+                runtime,
+                dispatch.request.node_id,
+                http_status,
+                opcua_status::BAD_USER_ACCESS_DENIED,
+                TlsTransportError::TrustRevoked,
+                #[cfg(feature = "diagnostic-runtime-counters")]
+                dispatch.request.sequence,
+            )
+            .await;
             return false;
         }
         {
             let mut data_access = runtime.lock().await;
+            #[cfg(feature = "diagnostic-runtime-counters")]
+            let counters_before = data_access.diagnostic_counters();
             data_access.record_buchi_write_result(
                 dispatch.request.node_id,
                 http_status,
@@ -927,10 +985,35 @@ async fn drain_pending_writes_over_tls_shared<const RESPONSE_CAPACITY: usize>(
                         observer.set_counts(failure.completed_fetches, failure.failed_fetches);
                         observer.set_http_status(failure.last_http_status.unwrap_or(http_status));
                         update_cache_status_probe(observer, data_access.cache());
+                        #[cfg(feature = "diagnostic-runtime-counters")]
+                        {
+                            crate::counter_events::record(
+                                2,
+                                u32::from(dispatch.request.node_id),
+                                dispatch.request.sequence,
+                                http_status,
+                                completion_status,
+                                crate::uptime_now_ms_u64(),
+                                counters_before,
+                                &data_access,
+                            );
+                            crate::counter_events::abort(2);
+                        }
                         return false;
                     }
                 }
             }
+            #[cfg(feature = "diagnostic-runtime-counters")]
+            crate::counter_events::record(
+                2,
+                u32::from(dispatch.request.node_id),
+                dispatch.request.sequence,
+                http_status,
+                completion_status,
+                crate::uptime_now_ms_u64(),
+                counters_before,
+                &data_access,
+            );
         }
     }
     true
@@ -943,14 +1026,31 @@ async fn record_write_completion_shared(
     http_status: i32,
     completion_status: u32,
     error: TlsTransportError,
+    #[cfg(feature = "diagnostic-runtime-counters")] write_sequence: u32,
 ) {
     observer.set_stage(TlsStage::Error);
     observer.set_error(error);
     observer.set_http_status(http_status);
     let mut data_access = runtime.lock().await;
+    #[cfg(feature = "diagnostic-runtime-counters")]
+    let counters_before = data_access.diagnostic_counters();
     data_access.set_buchi_status_inputs(true, false, false);
     data_access.record_buchi_write_result(node_id, http_status, completion_status);
     update_cache_status_probe(observer, data_access.cache());
+    #[cfg(feature = "diagnostic-runtime-counters")]
+    {
+        crate::counter_events::record(
+            2,
+            u32::from(node_id),
+            write_sequence,
+            http_status,
+            completion_status,
+            crate::uptime_now_ms_u64(),
+            counters_before,
+            &data_access,
+        );
+        crate::counter_events::abort(1);
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -966,6 +1066,20 @@ async fn fetch_endpoint_over_tls_shared<const RESPONSE_CAPACITY: usize>(
     observer: &impl TlsObserver,
     trust_source: BuchiTlsTrustSource,
     trust_generation: Option<u32>,
+    #[cfg(any(
+        feature = "diagnostic-runtime-counters",
+        feature = "diagnostic-cache-ages"
+    ))]
+    handshake_time_checked: bool,
+    #[cfg(feature = "diagnostic-runtime-counters")]
+    counter_session: &mut crate::counter_diagnostic::CounterSession,
+    #[cfg(feature = "diagnostic-cache-ages")]
+    cache_age_session: &mut crate::cache_age_diagnostic::CacheAgeSession,
+    #[cfg(any(
+        feature = "diagnostic-runtime-counters",
+        feature = "diagnostic-cache-ages"
+    ))]
+    poll_deadlines_ms: [u32; 3],
 ) -> bool {
     if !trust_session_current(trust_source, trust_generation).await {
         return false;
@@ -1080,7 +1194,32 @@ async fn fetch_endpoint_over_tls_shared<const RESPONSE_CAPACITY: usize>(
     if !trust_session_current(trust_source, trust_generation).await {
         return false;
     }
+    // Diagnostic admission holds the real trust owner first. No code holding
+    // runtime awaits trust (USB/revocation release trust before runtime). The
+    // startup try-lock snapshot is pre-executor, not this async lock order.
+    #[cfg(any(
+        feature = "diagnostic-runtime-counters",
+        feature = "diagnostic-cache-ages"
+    ))]
+    let trust_guard = match trust_source {
+        BuchiTlsTrustSource::Runtime(owner) => Some(owner.lock().await),
+        BuchiTlsTrustSource::Static { .. } => None,
+    };
+    #[cfg(any(
+        feature = "diagnostic-runtime-counters",
+        feature = "diagnostic-cache-ages"
+    ))]
+    if trust_guard.as_ref().is_some_and(|owner| {
+        runtime_trust_revoked()
+            || owner.state != TrustState::Verified
+            || Some(owner.generation) != trust_generation
+    }) {
+        return false;
+    }
     let mut data_access = runtime.lock().await;
+    #[cfg(feature = "diagnostic-runtime-counters")]
+    let event_before =
+        crate::counter_events::collecting().then(|| data_access.diagnostic_counters());
     match data_access.apply_http_response(
         endpoint,
         response.buffered(),
@@ -1094,9 +1233,74 @@ async fn fetch_endpoint_over_tls_shared<const RESPONSE_CAPACITY: usize>(
             observer.set_http_status(report.last_http_status.unwrap_or(0));
             observer.set_stage(TlsStage::CacheApplied);
             update_cache_status_probe(observer, data_access.cache());
+            #[cfg(feature = "diagnostic-cache-ages")]
+            if cache_age_session.after_get(
+                trust_guard.as_deref(),
+                trust_generation,
+                handshake_time_checked,
+                &mut data_access,
+                endpoint,
+                freshness_now_ms,
+                poll_deadlines_ms,
+            ) {
+                crate::cache_age_diagnostic::M7_CACHE_AGE_GATE();
+            }
+            #[cfg(feature = "diagnostic-runtime-counters")]
+            if counter_session.after_get(
+                trust_guard.as_deref(),
+                trust_generation,
+                handshake_time_checked,
+                &mut data_access,
+                endpoint,
+                freshness_now_ms,
+                poll_deadlines_ms,
+            ) {
+                // Seeded counts are actual owner state; do not expose the
+                // pre-seed report as a contradictory acceptance oracle.
+                observer.set_counts(
+                    data_access.cache().completed_fetches(),
+                    data_access.cache().failed_fetches(),
+                );
+                if crate::counter_diagnostic::M7_COUNTER_ADMISSION.0[0].load(Ordering::Acquire) == 1
+                {
+                    crate::counter_events::begin(
+                        trust_generation.expect("admitted runtime generation"),
+                    );
+                }
+                crate::counter_diagnostic::M7_COUNTER_ADMISSION_GATE();
+            }
+            #[cfg(feature = "diagnostic-runtime-counters")]
+            if let Some(before) = event_before {
+                crate::counter_events::record(
+                    1,
+                    match endpoint {
+                        Endpoint::Process => 0,
+                        Endpoint::Settings => 1,
+                        Endpoint::Info => 2,
+                    },
+                    0,
+                    200,
+                    opcua_status::GOOD,
+                    freshness_now_ms,
+                    before,
+                    &data_access,
+                );
+                if let Some(trust) = trust_guard.as_deref() {
+                    if crate::counter_events::finish(
+                        &data_access,
+                        trust.generation,
+                        trust.state as u32,
+                        freshness_now_ms,
+                    ) {
+                        crate::counter_events::M7_COUNTER_EVENTS_GATE();
+                    }
+                }
+            }
             true
         }
         Err(failure) => {
+            #[cfg(feature = "diagnostic-runtime-counters")]
+            crate::counter_events::abort(2);
             data_access.set_buchi_status_inputs(true, true, false);
             observer.set_error(TlsTransportError::CacheApply);
             observer.set_counts(failure.completed_fetches, failure.failed_fetches);
@@ -1155,6 +1359,8 @@ async fn record_transport_failure_shared(
     endpoint: Endpoint,
     error: TlsTransportError,
 ) {
+    #[cfg(feature = "diagnostic-runtime-counters")]
+    crate::counter_events::abort(1);
     observer.set_stage(TlsStage::Error);
     observer.set_error(error);
     let mut data_access = runtime.lock().await;

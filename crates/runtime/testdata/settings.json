@@ -1,0 +1,21 @@
+{
+    "display":{"brightness":75,"utcOffset":-330},
+    "sounds":{"buttonTone":true,"playSoundOnFinish":0},
+    "vacuum":{
+        "pressureHysteresis":125,
+        "altitude":1234,
+        "maxPermPressure":1000,
+        "maxPumpOutput":80,
+        "ventOnFinish":1
+    },
+    "rotation":{"startRotationOnStart":true,"stopRotationOnFinish":false},
+    "heating":{"maxTemperature":180,"stopHeatingOnFinish":1},
+    "cooling":{"stopCoolingOnFinish":0},
+    "lift":{"depthStop":120.5,"immerseOnStart":true,"liftOutFlaskOnFinish":false},
+    "program":{"eco":{
+        "isEnabled":true,
+        "activationAfterMins":15,
+        "heatingBathTemperature":42.125,
+        "coolantTemperature":12.5
+    }}
+}

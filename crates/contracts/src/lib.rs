@@ -196,4 +196,5 @@ pub mod freshness;
 /// Default namespace and write-surface contract.
 pub mod namespace;
 
-// Standalone private test suite omitted from this build-only source export.
+#[cfg(test)]
+mod tests;

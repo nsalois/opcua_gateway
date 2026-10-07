@@ -906,7 +906,16 @@ pub use buchi_client::{
 };
 
 mod data_access;
+#[cfg(feature = "diagnostic-cache-ages")]
+pub use data_access::diagnostic_ages::DiagnosticAgeObservation;
 pub use data_access::RuntimeDataAccess;
+#[cfg(feature = "diagnostic-cache-ages")]
+pub use opta_gateway_contracts::freshness::DiagnosticAge;
+
+#[cfg(feature = "diagnostic-runtime-counters")]
+mod diagnostic_counters;
+#[cfg(feature = "diagnostic-runtime-counters")]
+pub use diagnostic_counters::{DiagnosticCounterSeed, DiagnosticCounterSnapshot};
 
 mod cache;
 pub use cache::{
@@ -921,4 +930,5 @@ pub(crate) use runtime_values::{
     u32_value, NodeOwner,
 };
 
-// Standalone private test suite omitted from this build-only source export.
+#[cfg(test)]
+mod tests;

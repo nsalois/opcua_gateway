@@ -32,6 +32,13 @@ The lockfile also resolves optional platform and upstream development
 dependencies; presence in it does not mean a package is linked into M7.
 Any later binary distribution needs notices for its actual linked contents.
 
+## Synthetic test assets and distribution boundary
+
+The diagnostic certificate and public TLS test fixtures are newly generated
+original test assets under Apache-2.0; their provenance is recorded beside them.
+No private key, real vendor certificate, equipment manual, manufacturer artwork,
+embedded font or controller export is included in this source distribution.
+
 ## STMicroelectronics M4 interrupt table
 
 `firmware/opta-m4-quarantine/stm32h747xx-cm4-interrupts.csv` extracts

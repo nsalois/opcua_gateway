@@ -211,13 +211,20 @@ impl<
             return Ok(BuchiClientTaskStep::Started(kind));
         }
 
-        let step = {
+        let step_result = {
             let Some(transaction) = self.in_flight.as_mut() else {
                 return Ok(BuchiClientTaskStep::Idle);
             };
-            transaction
-                .drive_transport_step(transport, read_scratch)
-                .map_err(BuchiClientTaskError::Transport)?
+            transaction.drive_transport_step(transport, read_scratch)
+        };
+        let step = match step_result {
+            Ok(step) => step,
+            Err(error) => {
+                // A failed exchange cannot resume on a later connection.
+                // Release its fixed transaction slot before returning to the owner.
+                self.in_flight = None;
+                return Err(BuchiClientTaskError::Transport(error));
+            }
         };
 
         if matches!(

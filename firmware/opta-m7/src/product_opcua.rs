@@ -11,9 +11,11 @@ use embedded_io_async::{Read as _, Write as _};
 use opta_gateway_contracts::opcua_status;
 use opta_gateway_contracts::product;
 use opta_gateway_contracts::watchdog::WatchdogSlot;
+#[cfg(not(feature = "diagnostic-protocol-identifiers"))]
+use opta_opcua::TransportLimits;
 use opta_opcua::{
     decode_first_read_value_node, decode_uasc_request_info, parse_frame_header, FrameKind,
-    OpcUaServer, ServerIdentity, TransportLimits, PRODUCT_TARGET_BUFFER_SIZE,
+    OpcUaServer, ServerIdentity, PRODUCT_TARGET_BUFFER_SIZE,
 };
 use rtt_target::rprintln;
 use static_cell::ConstStaticCell;
@@ -147,6 +149,16 @@ enum OpcUaStage {
     Error = 0xff,
 }
 
+#[cfg(all(
+    feature = "diagnostic-stack-watermark",
+    feature = "diagnostic-accelerated-clock"
+))]
+pub(crate) fn watermark_listeners_idle() -> bool {
+    M7_OPCUA_LISTENER_STAGE
+        .iter()
+        .all(|stage| stage.load(Ordering::Relaxed) == OpcUaStage::Accept as u32)
+}
+
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum OpcUaTaskError {
@@ -214,11 +226,20 @@ pub(crate) async fn opcua_server_task(
         record_stage(listener_id, OpcUaStage::Connected);
         rprintln!("opcua/product: listener {} client connected", listener_id);
 
+        let session_nonce = next_opcua_session_token_nonce(listener_id);
+        #[cfg(not(feature = "diagnostic-protocol-identifiers"))]
         let mut server = OpcUaServer::new_with_limits_and_session_nonce(
             identity,
             &crate::build_info::OPCUA_BUILD_INFO,
             TransportLimits::product_target(),
-            next_opcua_session_token_nonce(listener_id),
+            session_nonce,
+        );
+        #[cfg(feature = "diagnostic-protocol-identifiers")]
+        let mut server = crate::protocol_id_diagnostic::new_server(
+            listener_id,
+            identity,
+            &crate::build_info::OPCUA_BUILD_INFO,
+            session_nonce,
         );
         let mut close_mode = OpcUaCloseMode::Abort;
         let accepted_ms = crate::uptime_now_ms();

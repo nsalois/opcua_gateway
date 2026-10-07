@@ -34,6 +34,7 @@ unsafe extern "C" {
 // the measurement-boot entry after reset. It only forwards to the existing
 // gate and adds no new memory access.
 #[unsafe(no_mangle)]
+#[inline(never)]
 pub extern "C" fn M7_STACK_WATERMARK_GATE() {
     measurement_boot_gate();
 }
@@ -99,9 +100,96 @@ pub(crate) fn measurement_boot_gate() {
     cortex_m::asm::dsb();
     cortex_m::asm::isb();
 
+    #[cfg(feature = "diagnostic-accelerated-clock")]
+    {
+        M7_STACK_WATERMARK_PAINT_GATE();
+        loop {
+            // This preparation is discarded, never an acceptance workload.
+            // Remain installable/running until the owned hardware breakpoint
+            // stops a fresh boot at PAINT_GATE. Refresh the inherited IWDG1;
+            // the second boot still uses the unchanged product watchdog policy.
+            crate::watchdog::iwdg1_refresh();
+            core::hint::spin_loop();
+        }
+    }
+    #[cfg(not(feature = "diagnostic-accelerated-clock"))]
     loop {
         // Under the authorized debugger this halts without executing further
         // stack-mutating Rust code. The harness resets instead of resuming.
         cortex_m::asm::bkpt();
     }
+}
+
+// SAFETY: stable cache-normalized preparation breakpoint for the combined
+// diagnostic only. The admitted runner owns the hardware breakpoint at entry.
+#[cfg(feature = "diagnostic-accelerated-clock")]
+#[unsafe(no_mangle)]
+#[inline(never)]
+pub extern "C" fn M7_STACK_WATERMARK_PAINT_GATE() {
+    core::hint::black_box(M7_STACK_WATERMARK_PHASE.load(Ordering::Acquire));
+}
+
+/// Capture only after the external repeated-operation observer has disconnected.
+/// This additional gate exists solely in the combined clock/watermark diagnostic.
+#[cfg(feature = "diagnostic-accelerated-clock")]
+static CAPTURE_REQUESTED: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
+
+#[cfg(feature = "diagnostic-accelerated-clock")]
+pub(crate) fn request_completed_workload_capture() {
+    CAPTURE_REQUESTED.store(true, Ordering::Release);
+}
+
+#[cfg(feature = "diagnostic-accelerated-clock")]
+#[embassy_executor::task]
+pub(crate) async fn completed_workload_capture_task(runtime: &'static crate::SharedRuntime) -> ! {
+    loop {
+        embassy_time::Timer::after_millis(100).await;
+        if !CAPTURE_REQUESTED.load(Ordering::Acquire) {
+            continue;
+        }
+        let completed = runtime.try_lock().is_ok_and(|data| {
+            data.health().buchi_write_completed_count >= 100 && data.write_queue_depth() == 0
+        });
+        if completed && crate::product_opcua::watermark_listeners_idle() {
+            break;
+        }
+    }
+    cortex_m::interrupt::free(|_| {
+        // SAFETY: the diagnostic is ending its acceptance window. Interrupts
+        // are masked while this sole SCB cache-policy transition runs. Arm's
+        // clean+invalidate sequence writes dirty stack lines to physical SRAM;
+        // Ethernet DMA remains in the board's noncacheable MPU region. No stack
+        // painting or application-state injection occurs on the measurement boot.
+        let mut cp = unsafe {
+            // SAFETY: exclusive interrupt-masked diagnostic SCB transition;
+            // cortex-m disable_dcache follows ST AN4839's clean requirement.
+            cortex_m::Peripherals::steal()
+        };
+        cp.SCB.disable_dcache(&mut cp.CPUID);
+        cortex_m::asm::dsb();
+        cortex_m::asm::isb();
+    });
+    M7_STACK_WATERMARK_PHASE.store(3, Ordering::Release);
+    M7_STACK_WATERMARK_CAPTURE_GATE();
+    cortex_m::interrupt::free(|_| {
+        // SAFETY: sole diagnostic SCB transition with interrupts masked. Cache
+        // was fully cleaned and disabled above; enable_dcache invalidates before
+        // enabling, as required by ST AN4839. No live state is painted.
+        let mut cp = unsafe { cortex_m::Peripherals::steal() };
+        cp.SCB.enable_dcache(&mut cp.CPUID);
+    });
+    loop {
+        embassy_time::Timer::after_secs(1).await;
+    }
+}
+
+// SAFETY: stable diagnostic capture breakpoint. The cache is already disabled
+// and the completed workload is quiescent. A hardware breakpoint stops at entry;
+// after capture the harness removes it and resumes normal diagnostic service.
+#[cfg(feature = "diagnostic-accelerated-clock")]
+#[unsafe(no_mangle)]
+#[inline(never)]
+pub extern "C" fn M7_STACK_WATERMARK_CAPTURE_GATE() {
+    core::hint::black_box(M7_STACK_WATERMARK_PHASE.load(Ordering::Acquire));
 }

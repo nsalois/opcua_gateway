@@ -48,7 +48,7 @@ impl MonitoredItemAddResult {
 pub struct MonitoredItem {
     pub node_id: u16,
     pub client_handle: u32,
-    last_sample_monotonic_ms: u32,
+    last_sample_monotonic_ms: u64,
     sampled_once: bool,
     last_cache_status: Option<CacheReadStatus>,
     last_opcua_status: Option<u32>,
@@ -207,14 +207,11 @@ impl<const CAPACITY: usize> DataChangeSubscription<CAPACITY> {
         data_access: &RuntimeDataAccess<WRITE_CAPACITY>,
         freshness_now_ms: u64,
     ) -> usize {
-        // Subscription scheduling stays on the deliberate short-horizon u32
-        // compare used by OPC UA; only cache freshness consumes the full u64.
-        let scheduler_now_ms = freshness_now_ms as u32;
         let mut changed_count = 0usize;
         for item in self.items.iter().flatten() {
             if item.sampled_once
-                && scheduler_now_ms.wrapping_sub(item.last_sample_monotonic_ms)
-                    < self.sampling_interval_ms
+                && freshness_now_ms.saturating_sub(item.last_sample_monotonic_ms)
+                    < u64::from(self.sampling_interval_ms)
             {
                 continue;
             }
@@ -235,17 +232,14 @@ impl<const CAPACITY: usize> DataChangeSubscription<CAPACITY> {
         data_access: &RuntimeDataAccess<WRITE_CAPACITY>,
         freshness_now_ms: u64,
     ) -> Option<DataChangeSample> {
-        // Subscription scheduling stays on the deliberate short-horizon u32
-        // compare used by OPC UA; only cache freshness consumes the full u64.
-        let scheduler_now_ms = freshness_now_ms as u32;
         let item = self.items.get_mut(slot)?.as_mut()?;
         if item.sampled_once
-            && scheduler_now_ms.wrapping_sub(item.last_sample_monotonic_ms)
-                < self.sampling_interval_ms
+            && freshness_now_ms.saturating_sub(item.last_sample_monotonic_ms)
+                < u64::from(self.sampling_interval_ms)
         {
             return None;
         }
-        item.last_sample_monotonic_ms = scheduler_now_ms;
+        item.last_sample_monotonic_ms = freshness_now_ms;
         item.sampled_once = true;
         let read = data_access.read_namespace_node_id(item.node_id, freshness_now_ms);
         let changed = item.last_cache_status != read.cache_status

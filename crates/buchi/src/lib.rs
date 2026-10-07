@@ -1403,4 +1403,5 @@ fn consume_one_or_more_digits(bytes: &[u8], mut cursor: usize) -> Option<usize> 
     Some(cursor)
 }
 
-// Standalone private test suite omitted from this build-only source export.
+#[cfg(test)]
+mod tests;

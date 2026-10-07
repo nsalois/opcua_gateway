@@ -19,7 +19,7 @@ These files differ from that baseline:
 | `src/eth/v2/mod.rs` | RMII ordering, bounded reset wait and failure callback. |
 | `src/flash/h7.rs` | Clear completion/error flags through the clear register. |
 | `src/usb/otg.rs` | Product progress hooks around bus and control operations. |
-| `src/time_driver/gp16.rs` | Opt-in time counters and tracing callbacks. |
+| `src/time_driver/gp16.rs` | Opt-in time counters, tracing callbacks and startup-only accelerated clock origin. |
 | `src/i2c/v1.rs` | Whitespace-only cleanup. |
 
 The 2026-10-01 source export adds a notice at the top of each changed source
@@ -39,3 +39,5 @@ additions: Copyright 2026 Nicholas Salois, Apache-2.0. The combined modified
 package is offered under Apache-2.0. These modifications are not an upstream
 Embassy release or an endorsement by its contributors. See the
 [license summary](../../THIRD_PARTY.md).
+
+The 2026-10-06 refresh also adds an opt-in accelerated-clock feature in `src/lib.rs`; it is absent from the default product.

@@ -72,6 +72,8 @@ impl OpcUaServer {
             subscription_lifetime_count: 10,
             publish_intervals_without_token: 0,
             publish_sequence_number: 1,
+            #[cfg(feature = "diagnostic-protocol-identifiers")]
+            initial_publish_sequence: None,
             queued_publish_requests: [None; MAX_QUEUED_PUBLISH_REQUESTS],
             queued_publish_count: 0,
             publishing_interval_ms: product::DATA_CHANGE_INTERVAL_MS,
@@ -303,6 +305,16 @@ impl OpcUaServer {
             requested_ms as u32
         };
         requested.clamp(MIN_SESSION_TIMEOUT_MS, MAX_SESSION_TIMEOUT_MS)
+    }
+
+    fn revise_publishing_interval_ms(requested_ms: f64) -> u32 {
+        // Part 4 5.14.2/5.14.3 permit revision to a supported interval.
+        // Signed modular deadline ordering requires a distance below 2^31.
+        // Encode this integer again so the client sees the actual timer value.
+        if !requested_ms.is_finite() {
+            return product::DATA_CHANGE_INTERVAL_MS;
+        }
+        (requested_ms as u32).clamp(product::DATA_CHANGE_INTERVAL_MS, u32::MAX / 2)
     }
 
     /// B.5a: reclaim activated session after revisedSessionTimeout with no activity.
@@ -1497,20 +1509,18 @@ impl OpcUaServer {
         let _max_notifs = d.read_u32().unwrap_or(0);
         let publishing_enabled = d.read_bool().unwrap_or(true);
         let _priority = d.read_u8().unwrap_or(0);
-        let revised_interval = requested_interval.max(product::DATA_CHANGE_INTERVAL_MS as f64);
-        let revised_interval_ms = if revised_interval > u32::MAX as f64 {
-            u32::MAX
-        } else {
-            revised_interval as u32
-        }
-        .max(product::DATA_CHANGE_INTERVAL_MS);
-        let revised_keepalive = requested_keepalive.max(1);
+        let revised_interval_ms = Self::revise_publishing_interval_ms(requested_interval);
+        let revised_keepalive = requested_keepalive.clamp(1, u32::MAX / 3);
         let revised_lifetime = requested_lifetime.max(revised_keepalive.saturating_mul(3));
         let service_result = if self.subscription_active {
             status::BAD_TOO_MANY_SUBSCRIPTIONS
         } else {
             self.subscription_active = true;
             self.publish_sequence_number = 1;
+            #[cfg(feature = "diagnostic-protocol-identifiers")]
+            if let Some(seed) = self.initial_publish_sequence.take() {
+                self.publish_sequence_number = seed;
+            }
             self.clear_publish_queue();
             self.publishing_interval_ms = revised_interval_ms.max(1);
             self.keepalive_count = revised_keepalive;
@@ -1530,7 +1540,7 @@ impl OpcUaServer {
         )?;
         Self::write_response_header(&mut e, request_handle, service_result)?;
         e.write_u32(self.subscription_id)?;
-        e.write_f64(revised_interval)?;
+        e.write_f64(f64::from(revised_interval_ms))?;
         e.write_u32(revised_lifetime)?;
         e.write_u32(revised_keepalive)?;
         Self::finish_uasc_response(e, len_pos)
@@ -1552,18 +1562,13 @@ impl OpcUaServer {
         let requested_keepalive = d.read_u32().unwrap_or(3);
         let _max_notifs = d.read_u32().unwrap_or(0);
         let _priority = d.read_u8().unwrap_or(0);
-        let revised_interval = requested_interval.max(product::DATA_CHANGE_INTERVAL_MS as f64);
-        let revised_interval_ms = if revised_interval > u32::MAX as f64 {
-            u32::MAX
-        } else {
-            revised_interval as u32
-        }
-        .max(product::DATA_CHANGE_INTERVAL_MS);
-        let revised_keepalive = requested_keepalive.max(1);
+        let revised_interval_ms = Self::revise_publishing_interval_ms(requested_interval);
+        let revised_keepalive = requested_keepalive.clamp(1, u32::MAX / 3);
         let revised_lifetime = requested_lifetime.max(revised_keepalive.saturating_mul(3));
         let service_result = if self.subscription_active && sub_id == self.subscription_id {
             self.publishing_interval_ms = revised_interval_ms;
             self.keepalive_count = revised_keepalive;
+            self.subscription_lifetime_count = revised_lifetime;
             self.empty_cycle_count = 0;
             self.next_publish_due_ms = now_monotonic_ms.wrapping_add(revised_interval_ms);
             opcua_status::GOOD
@@ -1577,7 +1582,7 @@ impl OpcUaServer {
             service_id::MODIFY_SUBSCRIPTION_RESPONSE,
         )?;
         Self::write_response_header(&mut e, request_handle, service_result)?;
-        e.write_f64(revised_interval)?;
+        e.write_f64(f64::from(revised_interval_ms))?;
         e.write_u32(revised_lifetime)?;
         e.write_u32(revised_keepalive)?;
         Self::finish_uasc_response(e, len_pos)

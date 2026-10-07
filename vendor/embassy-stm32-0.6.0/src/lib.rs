@@ -48,6 +48,11 @@ pub mod gpio;
 pub mod rcc;
 #[cfg(feature = "_time-driver")]
 mod time_driver;
+/// Read-only active driver state for the explicit accelerated diagnostic overlay.
+#[cfg(all(feature = "opta-accelerated-clock", not(feature = "_lp-time-driver")))]
+pub fn accelerated_clock_snapshot() -> [u32; 9] {
+    time_driver::accelerated_clock_snapshot()
+}
 pub mod timer;
 
 // Sometimes-present hardware

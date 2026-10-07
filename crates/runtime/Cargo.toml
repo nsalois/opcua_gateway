@@ -5,6 +5,15 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+host-validation = ["opta-gateway-contracts/host-validation"]
+# Finite owner-controlled seeds and readback; absent from normal product builds.
+diagnostic-runtime-counters = ["opta-gateway-contracts/diagnostic-publication-metadata"]
+diagnostic-cache-ages = ["opta-gateway-contracts/diagnostic-cache-ages"]
+
 [dependencies]
 opta-buchi = { path = "../buchi" }
 opta-gateway-contracts = { path = "../contracts" }
+
+[dev-dependencies]
+opta-gateway-contracts = { path = "../contracts", features = ["host-validation"] }

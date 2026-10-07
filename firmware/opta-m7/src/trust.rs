@@ -161,6 +161,11 @@ impl RuntimeTrust {
         }
     }
 
+    #[cfg(feature = "diagnostic-accelerated-clock")]
+    pub(crate) fn diagnostic_monotonic_origin(&self) -> u64 {
+        self.verifier_base_monotonic_ms
+    }
+
     pub(crate) fn transition_if_generation(
         &mut self,
         generation: u32,

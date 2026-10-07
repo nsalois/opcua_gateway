@@ -1,0 +1,26 @@
+{
+    "heating":{"set":42.125,"act":41.875,"running":true},
+    "cooling":{"set":-5.5,"act":4.25,"running":0},
+    "vacuum":{
+        "set":125,
+        "act":124.875,
+        "aerateValveOpen":1,
+        "aerateValvePulse":false,
+        "vacuumValveOpen":true,
+        "vaporTemp":65.5,
+        "autoDestIn":52.25,
+        "autoDestOut":48.75,
+        "powerPercentAct":75,
+        "running":1
+    },
+    "rotation":{"set":120,"act":120.5,"running":true},
+    "lift":{"set":220,"act":110.25,"limit":200.5},
+    "globalStatus":{
+        "running":true,
+        "processTime":1234,
+        "runId":4294967295,
+        "onHold":0,
+        "foamActive":1,
+        "currentError":-12
+    }
+}

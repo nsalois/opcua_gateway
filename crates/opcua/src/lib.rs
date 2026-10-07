@@ -166,6 +166,8 @@ pub struct OpcUaServer {
     /// Consecutive publishing-timer firings with no Publish request available (B.5b).
     publish_intervals_without_token: u32,
     publish_sequence_number: u32,
+    #[cfg(feature = "diagnostic-protocol-identifiers")]
+    initial_publish_sequence: Option<u32>,
     queued_publish_requests: [Option<QueuedPublishRequest>; MAX_QUEUED_PUBLISH_REQUESTS],
     queued_publish_count: usize,
     publishing_interval_ms: u32,
@@ -180,7 +182,11 @@ pub struct OpcUaServer {
     close_transport_after_session_fault: bool,
 }
 
+#[cfg(feature = "diagnostic-protocol-identifiers")]
+mod protocol_diagnostic;
 mod server;
+#[cfg(feature = "diagnostic-protocol-identifiers")]
+pub use protocol_diagnostic::DiagnosticIdentifierRecipe;
 
 mod node_access;
 pub(crate) use node_access::{
@@ -195,4 +201,5 @@ pub(crate) use browse::{RESULT_MASK_BROWSE_NAME, RESULT_MASK_DISPLAY_NAME};
 #[cfg(test)]
 extern crate std;
 
-// Standalone private test suite omitted from this build-only source export.
+#[cfg(test)]
+mod tests;

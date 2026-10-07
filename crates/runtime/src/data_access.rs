@@ -8,6 +8,9 @@ use opta_gateway_contracts::freshness::ScalarValue;
 use opta_gateway_contracts::last_fault::LastFaultRecord;
 use opta_gateway_contracts::opcua_status;
 
+#[cfg(feature = "diagnostic-cache-ages")]
+pub(super) mod diagnostic_ages;
+
 use crate::{
     endpoint_from_values, health_u32, lookup_default_namespace_node,
     runtime_node_contract_by_index, scalar_write_value_to_raw, BuchiTrustHealthSnapshot,
@@ -42,6 +45,53 @@ impl<const WRITE_CAPACITY: usize> RuntimeDataAccess<WRITE_CAPACITY> {
 
     pub const fn cache(&self) -> &RuntimeCache {
         &self.cache
+    }
+
+    /// Seed a Verified owner after a successful response, with no write history.
+    ///
+    /// `last_fetch_ok` records successful response processing, not a Good
+    /// baseline for any particular tag. A response containing only a sibling
+    /// field can satisfy it while the intended baseline tag is unavailable.
+    /// Firmware must separately prove a real current handshake/generation and
+    /// the required Good baseline, then hold trust/runtime owners through raw
+    /// readback. A host trust setter is not authentication. This method has no
+    /// await or intervening update.
+    /// Pristine accepted/completion counts reject even already-dequeued writes.
+    /// The seeded accepted count stays nonzero (saturating, not cache-owned),
+    /// so cache reset/reverification cannot rearm this owner.
+    #[cfg(feature = "diagnostic-runtime-counters")]
+    pub fn diagnostic_seed_counters(
+        &mut self,
+        seed: crate::DiagnosticCounterSeed,
+    ) -> Option<crate::DiagnosticCounterSnapshot> {
+        if !self.writes_allowed()
+            || !self.cache.last_fetch_ok()
+            || !self.write_queue.is_empty()
+            || self.next_write_sequence != 1
+            || self.health.buchi_write_accepted_count != 0
+            || self.health.buchi_write_completed_count != 0
+            || self.health.buchi_write_failed_count != 0
+        {
+            return None;
+        }
+        let value = seed.value();
+        self.next_write_sequence = value;
+        self.health.buchi_write_accepted_count = value;
+        self.health.buchi_write_completed_count = value;
+        self.health.buchi_write_failed_count = value;
+        self.cache.diagnostic_seed_successful_fetches(seed);
+        Some(self.diagnostic_counters())
+    }
+
+    #[cfg(feature = "diagnostic-runtime-counters")]
+    pub fn diagnostic_counters(&self) -> crate::DiagnosticCounterSnapshot {
+        crate::DiagnosticCounterSnapshot {
+            next_write_sequence: self.next_write_sequence,
+            accepted_writes: self.health.buchi_write_accepted_count,
+            completed_writes: self.health.buchi_write_completed_count,
+            failed_writes: self.health.buchi_write_failed_count,
+            successful_fetches: self.cache.completed_fetches(),
+        }
     }
 
     pub const fn health(&self) -> &RuntimeHealthState {
@@ -87,7 +137,7 @@ impl<const WRITE_CAPACITY: usize> RuntimeDataAccess<WRITE_CAPACITY> {
     pub fn set_trust_state(&mut self, state: TrustState) {
         if state != self.trust_state {
             self.cache = RuntimeCache::new();
-            self.write_queue.clear();
+            self.cancel_queued_writes_for_trust_loss();
         }
         self.health.buchi_verifier_time_trusted = false;
         self.trust_state = state;
@@ -303,13 +353,26 @@ impl<const WRITE_CAPACITY: usize> RuntimeDataAccess<WRITE_CAPACITY> {
     /// usable trust is provisioned again.
     pub fn revoke_upstream_trust(&mut self) {
         self.cache = RuntimeCache::new();
-        self.write_queue.clear();
+        self.cancel_queued_writes_for_trust_loss();
         self.health.buchi_configured = false;
         self.health.buchi_network_ready = false;
         self.health.buchi_body_truncated = false;
         self.write_enabled = false;
         self.trust_state = TrustState::Revoked;
         self.health.buchi_verifier_time_trusted = false;
+    }
+
+    fn cancel_queued_writes_for_trust_loss(&mut self) {
+        // Match the transport's pre-send trust-loss outcome. Coalesced requests
+        // occupy one entry; already-dequeued writes stay owned by the transport.
+        while let Some(request) = self.write_queue.pop() {
+            self.record_buchi_write_result(
+                request.node_id,
+                0,
+                opcua_status::BAD_USER_ACCESS_DENIED,
+            );
+        }
+        self.write_queue.clear();
     }
 
     pub fn apply_http_response(
@@ -748,5 +811,49 @@ impl<const WRITE_CAPACITY: usize> RuntimeDataAccess<WRITE_CAPACITY> {
 impl<const WRITE_CAPACITY: usize> Default for RuntimeDataAccess<WRITE_CAPACITY> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod counter_tests {
+    use super::RuntimeDataAccess;
+    use crate::RuntimeNode;
+    use opta_gateway_contracts::{config::TrustState, freshness::ScalarValue, opcua_status};
+
+    #[test]
+    fn accelerated_write_sequences_wrap_and_health_counts_saturate() {
+        for seed in [u32::MAX - 2, u32::MAX - 1, u32::MAX] {
+            let mut data = RuntimeDataAccess::<1>::new();
+            data.set_trust_state(TrustState::Verified);
+            data.set_write_enabled(true);
+            data.next_write_sequence = seed;
+            data.health.buchi_write_accepted_count = seed;
+            data.health.buchi_write_completed_count = seed;
+            data.health.buchi_write_failed_count = seed;
+            for operation in 0..5u64 {
+                let accepted = data.enqueue_write_node(
+                    RuntimeNode::ProcessHeatingSet,
+                    ScalarValue::FloatMilli(42_000),
+                );
+                assert!(accepted.accepted);
+                assert_eq!(
+                    accepted.sequence,
+                    Some(((u64::from(seed) + operation) % 4_294_967_296) as u32)
+                );
+                let request = data.pop_write_request().unwrap();
+                assert_eq!(Some(request.sequence), accepted.sequence);
+                data.record_buchi_write_result(request.node_id, 200, opcua_status::GOOD);
+                data.record_buchi_write_result(
+                    request.node_id,
+                    503,
+                    opcua_status::BAD_NOT_CONNECTED,
+                );
+                let expected = (u64::from(seed) + operation + 1).min(u64::from(u32::MAX)) as u32;
+                assert_eq!(data.health.buchi_write_accepted_count, expected);
+                assert_eq!(data.health.buchi_write_completed_count, expected);
+                assert_eq!(data.health.buchi_write_failed_count, expected);
+                assert_eq!(data.write_queue_depth(), 0);
+            }
+        }
     }
 }

@@ -159,6 +159,11 @@ pub(crate) fn initialize_task_checkins(now_ms: u32) {
     M7_WATCHDOG_PUBLIC_FRESH_MASK.store(watchdog_contract::ALL_TASKS_MASK, Ordering::Relaxed);
 }
 
+#[cfg(feature = "diagnostic-accelerated-clock")]
+pub(crate) fn diagnostic_initial_checkins() -> [u32; TASK_CHECKIN_COUNT] {
+    core::array::from_fn(|index| TASK_CHECKINS_MS[index].load(Ordering::Relaxed))
+}
+
 fn record_task_checkin(task: WatchdogSlot, now_ms: u32) -> bool {
     #[cfg(any(
         feature = "diagnostic-suppress-net-runner-checkin",
@@ -500,7 +505,16 @@ pub(crate) async fn watchdog_monitor_task() -> ! {
             // exact pure contract says the active outer scope is under bound.
             iwdg1_refresh();
             M7_WATCHDOG_LAST_KICK_MS.store(now_ms, Ordering::Relaxed);
+            #[cfg(feature = "diagnostic-trust-heartbeat-counters")]
+            let before_refresh = M7_WATCHDOG_REFRESH_COUNT.load(Ordering::Relaxed);
             M7_WATCHDOG_REFRESH_COUNT.fetch_add(1, Ordering::Relaxed);
+            #[cfg(feature = "diagnostic-trust-heartbeat-counters")]
+            crate::trust_heartbeat_diagnostic::refresh(
+                before_refresh,
+                M7_WATCHDOG_REFRESH_COUNT.load(Ordering::Relaxed),
+                now_ms_u64,
+                true,
+            );
             continue;
         }
         let snapshot = watchdog_snapshot(now_ms);
@@ -511,7 +525,16 @@ pub(crate) async fn watchdog_monitor_task() -> ! {
         if snapshot.all_reset_critical_fresh {
             iwdg1_refresh();
             M7_WATCHDOG_LAST_KICK_MS.store(now_ms, Ordering::Relaxed);
+            #[cfg(feature = "diagnostic-trust-heartbeat-counters")]
+            let before_refresh = M7_WATCHDOG_REFRESH_COUNT.load(Ordering::Relaxed);
             M7_WATCHDOG_REFRESH_COUNT.fetch_add(1, Ordering::Relaxed);
+            #[cfg(feature = "diagnostic-trust-heartbeat-counters")]
+            crate::trust_heartbeat_diagnostic::refresh(
+                before_refresh,
+                M7_WATCHDOG_REFRESH_COUNT.load(Ordering::Relaxed),
+                now_ms_u64,
+                false,
+            );
             continue;
         }
 

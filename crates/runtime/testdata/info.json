@@ -1,0 +1,27 @@
+{
+    "controller":{
+        "operatingTimeCounter":100,
+        "runCounters":{
+            "totalRuns":10,
+            "manual":1,
+            "timer":2,
+            "continuous":3,
+            "solvent":4,
+            "method":5,
+            "autoDest":6,
+            "cloudDest":7,
+            "drying":8,
+            "leakTest":9,
+            "calibration":11
+        }
+    },
+    "bath":{"operatingTimeCounter":200,"hoursOver190C":12},
+    "chiller":{"operatingTimeCounter":300,"pumpHours":301,"compressorHours":302,"valveCounter":303},
+    "rotavapor":{"operatingTimeCounter":400,"rotationHours":401,"liftMoves":402},
+    "pump":{
+        "operatingTimeCounter":500,
+        "module1":{"switchOn":501,"overCurrent":1.25,"maxCurrent":2.5,"maxTemperature":-3.75},
+        "module2":{"switchOn":601,"overCurrent":4.125,"maxCurrent":5.875,"maxTemperature":6.5}
+    },
+    "vacubox":{"operatingTimeCounter":700}
+}

@@ -10,3 +10,8 @@ path = "src/lib.rs"
 [features]
 default = ["product"]
 product = []
+host-validation = []
+# Read-only publication state for explicitly selected target diagnostics.
+diagnostic-publication-metadata = []
+# Finite cache age cases; no generic target timestamp or value setter.
+diagnostic-cache-ages = ["diagnostic-publication-metadata"]
