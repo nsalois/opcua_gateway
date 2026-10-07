@@ -21,6 +21,12 @@ it provides no OPC UA authentication or transport encryption. Deployments requir
 an appropriately controlled network. Methods, Events, History and PubSub are
 outside the implemented surface.
 
+## Download firmware
+
+- [M7 firmware 1.3.9](https://github.com/nsalois/opcua_gateway/releases/download/v1.3.9/opta-m7-1.3.9.bin)
+- [M4 companion 1.1.0](https://github.com/nsalois/opcua_gateway/releases/download/v1.3.9/opta-m4-1.1.0.bin)
+- [Checksums](https://github.com/nsalois/opcua_gateway/releases/download/v1.3.9/SHA256SUMS) and [build information](https://github.com/nsalois/opcua_gateway/releases/download/v1.3.9/firmware-manifest.json)
+
 ## Build on Linux
 
 Use Linux x86_64, Python 3.11+, Git, GCC and LLVM tools providing `ld.lld`,
@@ -56,7 +62,7 @@ Save source changes in Git before building a candidate. Clear ambient
 
 ```bash
 python3 -B tools/check_m7_build_resource.py --build-std \
-  --release-candidate --version 1.3.8 \
+  --release-candidate --version 1.3.9 \
   --archive-dir "$PWD/build-output/archive" \
   --output "$PWD/build-output/m7-report.json"
 python3 -B tools/check_m4_quarantine_build_resource.py --build-std \
@@ -71,20 +77,7 @@ compiler's `core` and `compiler_builtins` through
 M7 selects the default product features. The `--release-candidate` option checks
 source cleanliness and product composition.
 
-The commands above create these files on your computer:
-
-| Result | Location |
-| --- | --- |
-| M7 ELF and BIN | `target/thumbv7em-none-eabihf/release/opta-m7` and `.bin` |
-| M4 ELF and BIN | `target/opta-m4-quarantine/thumbv7em-none-eabihf/release/opta-m4-quarantine` and `.bin` |
-| Versioned binary copies | `build-output/archive/m7/1.3.8/m7.bin`, `build-output/archive/m4/1.1.0/m4.bin` |
-| Resource and source-identity reports | `build-output/m7-report.json`, `build-output/m4-report.json` |
-
-The reports record each build’s source revision and resource use. See the
-[M4 notes](firmware/opta-m4-quarantine/README.md) for companion firmware details.
-
-This source-only repository includes host tests and build tools. See the
-[testing report](firmware-testing-report.md) for test coverage and results.
+See the [testing report](firmware-testing-report.md) for test coverage and results.
 
 ## Licensing
 

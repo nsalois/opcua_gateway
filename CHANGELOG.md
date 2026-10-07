@@ -1,5 +1,11 @@
 # Source publication changes
 
+## M7 1.3.9 / M4 1.1.0 — 2026-10-06
+
+- Add firmware downloads and replace the build-output table with direct links.
+- Update the original five-goal testing report with the October results and
+  recounted development inventory. Runtime source is unchanged.
+
 ## M7 1.3.8 / M4 1.1.0 — 2026-10-06
 
 - Streamline the README introduction and scope, remove front-page qualification

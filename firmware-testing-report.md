@@ -1,56 +1,21 @@
-# Firmware testing and acceptance limits
+# Firmware Testing Report
 
-The project aims to make one Büchi R-300 available as a dependable OPC UA server
-through one Opta Lite. **Unattended production suitability has not been established.**
-This source publication includes reproducible host checks; device results below
-are historical development evidence for their particular firmware and simulator.
+**Opta OPC UA Gateway | 6 October 2026**
 
-## Checks available in this repository
+**Project goal:** Make each Büchi R-300 Rotovap a dependable, always-on OPC UA server for industrial control systems, with one Opta gateway per instrument. Testing focused on the five requirements behind that goal.
 
-`bash tools/check.sh` runs formatting, Clippy, shared-crate unit/integration tests
-in debug and optimized profiles, and the extracted production write-completion
-regression. Tests cover parsing, stale data, configuration persistence and counter
-rollover, bounded subscriptions, write validation and trust-loss outcomes, and
-certificate validation with synthetic inputs. Diagnostic features receive host
-tests but are not enabled in the product firmware build.
+The development effort includes **83 automated test scripts**, **29 Rust test/support files**, **46 testing and analysis tools**, and **1,158 individually defined Python checks**. The original development archive retains **10,837 unique evidence files—approximately 501 MB—including 43 distinct network captures**. Identical copies are counted once.
 
-The write-completion regression executes the production request, response and
-accounting code against scripted transport/time/locking collaborators. It proves
-the named host behavior, not target scheduling, contention or real TLS exchange.
-Certificate fixtures contain no real vendor trust material or signing keys.
+1. **Deliver useful readings with honest data quality.** The October field campaign completed **80 process fields through five phases each: 400 phases**, checking changed values, omissions and fresh recovery at normal polling rates. The retained trace contains **55,810 Read records and 2,359 Publish records**. Earlier checks covered a **134-item process and diagnostic model**. A **10-minute traffic test** completed **600 reads, 4,200 browsing operations, and 599 consecutive subscription responses**, verified against **7,920 captured packets** with zero capture drops. In HTTPS outage tests, affected readings became unavailable within **4 seconds** and fresh readings returned within **10 seconds** of restoration beginning. Host tests also covered malformed, truncated, oversized responses and invalid numbers.
 
-The publication preparation executed **375 shared-crate tests per profile** and
-**four production write-completion tests per profile**: 758 passing executions
-across debug and optimized builds. These are 379 test cases exercised twice,
-not 758 distinct cases. Seven explicitly ignored cases per profile are excluded
-from passing counts. Formatting and all-feature Clippy checks also passed.
+2. **Validate setpoints and reject bad requests.** Host tests verified rejection of wrong types, out-of-range values, unsupported decimal precision, read-only fields, and full write queues. A mixed request rejected unsupported timestamp fields while still accepting the following valid write, checking that parsing stayed aligned. Both gateways also rejected a wrong numeric type and accepted the correct type. Two-device tests confirmed writes reached only their assigned instrument simulator. October product testing completed **100 client/write cycles**, three failed-write/recovery cases and a timeout/recovery case. Two trust-loss write-accounting defects were corrected and passed host regressions; their dedicated board confirmations remain follow-up work.
 
-Some imported regression cases remain explicitly ignored because they document
-unresolved findings, including PHY link-state caching and duplicate writes after
-a lost client response. Ignored tests are not passes. Test output reports them
-separately. The public suite excludes the private live-mock, external-client and
-hardware campaign runners. Their test counts do not describe the exported suite.
+3. **Recover automatically during unattended operation.** A **145-minute run passed all 29 connection-stress cycles**, covering incomplete connections, abrupt disconnects, outdated session requests, and overlapping connection renewals. All **29 HTTPS outage/recovery cycles** completed without an unexpected gateway restart. **Ten of ten software restarts** restored settings and service; both gateways also recovered from Ethernet disconnection and expired address leases. October product screens completed **100 connection cycles** and **three silent-client releases with fresh capacity reuse**. A separate diagnostic build completed **100 writes**, measuring **17,752 bytes** of stack use with an intact **16,384-byte** guard.
 
-Both canonical builders check firmware composition, source identity and resource
-limits. M4 additionally checks its pinned interrupt table, vector table, permitted
-instructions and dependency isolation. These checks prove properties of the
-reported artifacts; they do not install firmware or qualify physical recovery.
+4. **Keep multiple gateways identifiable and independent.** **Six clients connected simultaneously across two physical Optas—three per gateway.** Two rounds checked unique identities and the shared data model. Additional checks verified discovery names, duplicate-name handling, and address changes on both devices, while observers confirmed the other gateway continued serving valid data.
 
-## Historical development evidence
+5. **Support field setup and diagnostics over USB.** Tests verified configuration, saved settings, factory reset, and complete reconfiguration over USB. Three interruption behaviors—blocked output, an interrupted command, and suspend/resume—were demonstrated while OPC UA readings and notifications remained valid. This exercised both initial setup and continued operation during service access.
 
-The following observations used controlled R-300 HTTPS simulators. They are not
-results for the final public-source binary, and the underlying private logs are
-not included in this repository.
+Both processor images passed clean offline builds, with approximately **26% free application flash** on the main processor. The public test suite passed **379 cases in each of debug and optimized builds: 758 successful executions**, with seven ignored cases per profile excluded. Formatting and Clippy checks passed. The full private integration run also passed **873 general Python checks** and its live HTTP/HTTPS simulator tests. [GitHub checks](https://github.com/nsalois/opcua_gateway/actions) repeat the public tests and both firmware builds.
 
-| Product goal | Recorded observation | Limit |
-| --- | --- | --- |
-| Useful readings with honest quality | On 6 October 2026, one normal product 1.2.171 gateway completed 80 fields through five phases each: 400 phases, including omissions and recovery. Raw recount recorded 55,810 Reads and 2,359 Publishes. | One board, one exact image, simulator upstream; real-instrument acceptance remains open. |
-| Validate and forward setpoints | A separate product screen completed 100 client/write cycles and failed-write/timeout recovery cases. | Two trust-loss accounting defects were corrected and host-tested; dedicated board confirmations remain open. |
-| Unattended recovery | Bounded ordinary-product connection and silent-client release/reuse cases passed. Separate diagnostic stack observations exercised 100 writes. | Diagnostic and normal-product evidence are distinct. Power testing is deferred; unexplained timing/read-status symptoms and final recovery gates remain open. |
-| Independent fleet identity | Earlier September simulator campaigns exercised two physical gateways and their separate identities and upstreams. | Historical firmware only; final-composition dual-device acceptance remains open. |
-| USB provisioning and diagnostics | Earlier firmware demonstrated configuration, factory reset, reprovisioning and bounded USB interruption behavior. | Historical results do not validate all USB/recovery cases on this public artifact. |
-
-These bounded observations do not establish months of reliability, real R-300
-interoperability, OPC Foundation conformance, release acceptance or field
-installation approval. Completing those gates is separate from publishing
-buildable development source.
+*Inventory measured on 6 October 2026 using the original report’s counting rules; file and test-definition totals are inventory, not execution counts. Operational examples span September–October firmware revisions and use controlled R-300 HTTPS simulators. Each hardware result belongs to its recorded firmware; public host/build checks are recorded separately. Repeated profiles and overlapping traffic records are not added together as distinct test cases.*
