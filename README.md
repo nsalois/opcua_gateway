@@ -4,11 +4,6 @@ Rust firmware connecting one Büchi R-300 Rotavapor to an industrial OPC UA
 client through an Arduino/Finder Opta Lite. The Cortex-M7 runs the gateway;
 a separately built, inert Cortex-M4 companion keeps that core from interfering.
 
-**Development source: production qualification is incomplete.** This repository
-contains source, host tests and firmware build checks. Its builds are not approved
-installation packages. Simulator tests do not establish real R-300 compatibility
-or months of unattended operation. See the [testing report](firmware-testing-report.md).
-
 ## What it does
 
 - Polls numeric and boolean R-300 data over verified HTTPS.
@@ -24,7 +19,7 @@ network administrator.
 The OPC UA endpoint uses **SecurityPolicy None and anonymous sessions**;
 it provides no OPC UA authentication or transport encryption. Deployments require
 an appropriately controlled network. Methods, Events, History and PubSub are
-outside the implemented surface. No OPC Foundation certification is claimed.
+outside the implemented surface.
 
 ## Build on Linux
 
@@ -61,7 +56,7 @@ Save source changes in Git before building a candidate. Clear ambient
 
 ```bash
 python3 -B tools/check_m7_build_resource.py --build-std \
-  --release-candidate --version 1.3.1 \
+  --release-candidate --version 1.3.8 \
   --archive-dir "$PWD/build-output/archive" \
   --output "$PWD/build-output/m7-report.json"
 python3 -B tools/check_m4_quarantine_build_resource.py --build-std \
@@ -73,42 +68,23 @@ python3 -B tools/check_m4_quarantine_build_resource.py --build-std \
 The canonical builders use Cargo locked/offline mode and rebuild the pinned
 compiler's `core` and `compiler_builtins` through
 [build-std](https://doc.rust-lang.org/cargo/reference/unstable.html#build-std).
-M7 selects only the default product features. Neither builder contacts hardware.
-`--release-candidate` checks cleanliness and composition; it is not production
-acceptance.
+M7 selects the default product features. The `--release-candidate` option checks
+source cleanliness and product composition.
+
+The commands above create these files on your computer:
 
 | Result | Location |
 | --- | --- |
 | M7 ELF and BIN | `target/thumbv7em-none-eabihf/release/opta-m7` and `.bin` |
 | M4 ELF and BIN | `target/opta-m4-quarantine/thumbv7em-none-eabihf/release/opta-m4-quarantine` and `.bin` |
-| Versioned binary copies | `build-output/archive/m7/1.3.1/m7.bin`, `build-output/archive/m4/1.1.0/m4.bin` |
+| Versioned binary copies | `build-output/archive/m7/1.3.8/m7.bin`, `build-output/archive/m4/1.1.0/m4.bin` |
 | Resource and source-identity reports | `build-output/m7-report.json`, `build-output/m4-report.json` |
 
-Keep reports beside their binaries. Both reports must identify the same source
-commit and clean state. M7 embeds its version, source identity and build flavor;
-M4 records source identity externally. See the [M4 notes](firmware/opta-m4-quarantine/README.md).
+The reports record each build’s source revision and resource use. See the
+[M4 notes](firmware/opta-m4-quarantine/README.md) for companion firmware details.
 
-## Versions and source scope
-
-This publication uses **M7 1.3.1** and **M4 1.1.0**. M7 1.3.0 is reserved for
-prepublication validation. Firmware versions are independent of internal Cargo
-package versions. Changed source requires a new M7 version: update its `VERSION`
-file, the commands above and the workflow together. Embedded source identity
-changes bytes even for documentation-only commits. Reuse an M4 version only
-when its binary is identical. Never assign different bytes to an existing
-processor/version; independent clones do not coordinate numbering.
-
-The five shared crates, both firmware crates and modified Embassy dependency
-retain their original structure. Host regression suites and synthetic fixtures
-are included. Bench services, hardware runners, recovery images, real vendor
-certificates and the equipment manual are outside this source distribution.
-Diagnostic and maintenance features remain opt-in; the supported build above
-is the default product. The [diagnostic CA](firmware/opta-m7/src/certs/README.md)
-and [TLS fixtures](crates/tls-verify/testdata/README.md) are synthetic.
-
-[GitHub checks](.github/workflows/check.yml) run the same host checks and both
-firmware builders. Historical tests and remaining acceptance work are described
-separately in the [testing report](firmware-testing-report.md).
+This source-only repository includes host tests and build tools. See the
+[testing report](firmware-testing-report.md) for test coverage and results.
 
 ## Licensing
 

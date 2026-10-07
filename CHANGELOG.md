@@ -1,5 +1,11 @@
 # Source publication changes
 
+## M7 1.3.8 / M4 1.1.0 — 2026-10-06
+
+- Streamline the README introduction and scope, remove front-page qualification
+  notices, and clarify that its output table describes locally generated files.
+  Runtime source is unchanged; M7 is rebuilt to record the updated revision.
+
 ## M7 1.3.1 / M4 1.1.0 — 2026-10-06
 
 - Refresh subscription scheduling and interval/lifetime handling, including
